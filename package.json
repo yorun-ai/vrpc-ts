@@ -1,0 +1,113 @@
+{
+  "name": "@yorun-ai/vrpc",
+  "version": "0.9.0",
+  "description": "vRPC and HTTP request library",
+  "homepage": "https://github.com/yorun-ai/vrpc-ts#readme",
+  "bugs": {
+    "url": "https://github.com/yorun-ai/vrpc-ts/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yorun-ai/vrpc-ts.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.zh-CN.md",
+    "CONTRIBUTING.md",
+    "docs",
+    "package.json"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/client.cjs",
+  "module": "./dist/client.es.js",
+  "types": "./dist/client.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/client.d.ts",
+        "default": "./dist/client.es.js"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.ts",
+        "default": "./dist/client.es.js"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    },
+    "./http": {
+      "import": {
+        "types": "./dist/http.d.ts",
+        "default": "./dist/http.es.js"
+      },
+      "require": {
+        "types": "./dist/http.d.cts",
+        "default": "./dist/http.cjs"
+      }
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vite build && rolldown -c rolldown.dts.config.ts && node ./scripts/finalize-types.mjs",
+    "type-check": "tsc -p tsconfig.app.json --noEmit --skipLibCheck && tsc -p tsconfig.node.json --noEmit --skipLibCheck",
+    "test": "vitest run",
+    "test:package": "node ./scripts/test-package.mjs && pnpm test:types:package && pnpm test:publint && pnpm test:attw",
+    "test:types:package": "node ./scripts/test-package-types.mjs",
+    "test:publint": "publint",
+    "test:attw": "attw --pack . --ignore-rules no-resolution",
+    "test:watch": "vitest",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "prepare": "husky",
+    "version:alpha:patch": "tsx ./scripts/version --type=patch --stage=alpha",
+    "version:alpha:minor": "tsx ./scripts/version --type=minor --stage=alpha",
+    "version:alpha:major": "tsx ./scripts/version --type=major --stage=alpha",
+    "version:patch": "tsx ./scripts/version --type=patch",
+    "version:minor": "tsx ./scripts/version --type=minor",
+    "version:major": "tsx ./scripts/version --type=major",
+    "release": "tsx ./scripts/release",
+    "release:dry-run": "tsx ./scripts/release --dry-run"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "^26.1.1",
+    "@types/semver": "^7.7.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "publint": "0.3.21",
+    "rolldown": "1.1.5",
+    "rolldown-plugin-dts": "0.27.12",
+    "semver": "^7.8.5",
+    "simple-git": "^3.36.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10",
+    "yargs": "^18.0.0",
+    "zx": "^8.8.5"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx}": [
+      "oxlint --fix"
+    ],
+    "*": "oxfmt --no-error-on-unmatched-pattern"
+  },
+  "packageManager": "pnpm@11.15.0"
+}

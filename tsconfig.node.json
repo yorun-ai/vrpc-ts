@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "types": ["node"],
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts", "rolldown.dts.config.ts"]
+}

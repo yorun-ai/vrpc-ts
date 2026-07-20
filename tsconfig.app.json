@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "src/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*", "test/**/*", "vite.config.ts"],
+  "exclude": ["test/package-consumers"]
+}
