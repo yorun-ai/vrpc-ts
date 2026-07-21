@@ -50,7 +50,6 @@ jobs:
         run: pnpm release:ci
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
         shell: bash
@@ -63,7 +62,6 @@ jobs:
             prerelease=(--prerelease)
           fi
           gh release create "v$RELEASE_VERSION" \
-            --verify-tag \
             --generate-notes \
             --title "v$RELEASE_VERSION" \
             "${prerelease[@]}"
