@@ -81,6 +81,7 @@
     "version:minor": "tsx ./scripts/version --type=minor",
     "version:major": "tsx ./scripts/version --type=major",
     "release": "tsx ./scripts/release",
+    "release:ci": "tsx ./scripts/release --ci",
     "release:dry-run": "tsx ./scripts/release --dry-run"
   },
   "devDependencies": {

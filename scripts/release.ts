@@ -12,6 +12,11 @@ const packageJsonPath = path.join(process.cwd(), "package.json");
 const git = SimpleGit();
 
 const dryRun = Boolean(argv["dry-run"]);
+const ci = Boolean(argv.ci);
+
+if (ci && dryRun) {
+  throw new Error("CI publishing and dry-run mode cannot be enabled together.");
+}
 
 async function assertCleanWorkingTree() {
   const gitStatus = await git.status();
@@ -34,6 +39,26 @@ async function prepareGit() {
     success: "The working directory is clean",
     error: "The working directory must be clean before pulling or publishing",
   });
+
+  if (ci) {
+    if (process.env.GITHUB_ACTIONS !== "true") {
+      throw new Error("CI publishing is only supported from GitHub Actions.");
+    }
+    if (process.env.GITHUB_REF !== "refs/heads/main") {
+      throw new Error(
+        `CI publishing requires the main branch, received ${process.env.GITHUB_REF}.`,
+      );
+    }
+
+    const head = (await git.revparse(["HEAD"])).trim();
+    const originMain = (await git.revparse(["refs/remotes/origin/main"])).trim();
+    if (head !== originMain) {
+      throw new Error("The release commit must be the current origin/main commit.");
+    }
+
+    logger.success("The GitHub Actions checkout matches origin/main");
+    return;
+  }
 
   await run(git.raw(["pull", "--ff-only"]), {
     info: "Pulling the latest changes from the remote repository",
@@ -124,6 +149,21 @@ async function createStagingDirectory(packageJson: Record<string, unknown>) {
 }
 
 async function assertAuthenticated(registry: string) {
+  if (ci) {
+    if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL || !process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
+      throw new Error(
+        "GitHub Actions OIDC is unavailable. Grant the workflow id-token: write permission.",
+      );
+    }
+
+    logger.success(
+      process.env.NODE_AUTH_TOKEN
+        ? "GitHub Actions OIDC and the bootstrap npm token are available"
+        : "GitHub Actions OIDC is available for npm trusted publishing",
+    );
+    return;
+  }
+
   if (!process.env.NPM_CONFIG_USERCONFIG) {
     throw new Error("Set NPM_CONFIG_USERCONFIG to the npm userconfig used for publishing.");
   }
@@ -159,6 +199,11 @@ async function publish() {
   };
 
   const version = packageJson.version;
+  if (ci && process.env.RELEASE_VERSION !== version) {
+    throw new Error(
+      `Requested release ${String(process.env.RELEASE_VERSION)} does not match package.json version ${version}.`,
+    );
+  }
   const npmTag = getNpmTag(version);
   const tag = `v${version}`;
 
@@ -182,6 +227,7 @@ async function publish() {
       `--registry=${registry}`,
       `--tag=${npmTag}`,
       "--access=public",
+      ...(ci ? ["--provenance"] : []),
       ...(dryRun ? ["--dry-run"] : []),
     ];
 
