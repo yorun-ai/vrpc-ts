@@ -231,7 +231,7 @@ async function publish() {
       ...(dryRun ? ["--dry-run"] : []),
     ];
 
-    await run($`npm ${publishArgs}`, {
+    await run($({ stdio: ci ? "pipe" : "inherit" })`npm ${publishArgs}`, {
       info: dryRun ? "Running npm publish dry-run" : "Publishing the package",
       success: dryRun
         ? "The npm publish dry-run completed successfully"
