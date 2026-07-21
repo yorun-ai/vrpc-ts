@@ -1,5 +1,9 @@
 # @yorun-ai/vrpc
 
+[![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
+[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&color=cb3837)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
+
 [English](README.md) | **简体中文**
 
 用于 Vine vRPC 与通用 HTTP 请求的客户端运行时。

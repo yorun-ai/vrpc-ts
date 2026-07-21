@@ -1,5 +1,9 @@
 # @yorun-ai/vrpc
 
+[![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
+[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&color=cb3837)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
+
 **English** | [简体中文](README.zh-CN.md)
 
 Client runtime for Vine vRPC and generic HTTP requests.
