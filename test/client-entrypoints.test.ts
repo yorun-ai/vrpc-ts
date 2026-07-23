@@ -15,6 +15,18 @@ describe("client entrypoints", () => {
     expect(httpEntrypoint.createHttpClient).toBeTypeOf("function");
   });
 
+  it("exposes one error guard for each client entrypoint", () => {
+    expect(clientEntrypoint.isVrpcError).toBeTypeOf("function");
+    expect(httpEntrypoint.isHttpError).toBeTypeOf("function");
+    expect("isAbortError" in clientEntrypoint).toBe(false);
+    expect("isAbortError" in httpEntrypoint).toBe(false);
+  });
+
+  it("does not expose a parse error for lenient generic HTTP parsing", () => {
+    expect("HttpParseError" in clientEntrypoint).toBe(false);
+    expect("HttpParseError" in httpEntrypoint).toBe(false);
+  });
+
   it("only publishes client and http entrypoints", () => {
     expect(Object.keys(packageJson.exports)).toEqual([".", "./client", "./http"]);
   });

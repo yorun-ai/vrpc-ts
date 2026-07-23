@@ -1,3 +1,4 @@
+import { VrpcInvokeError } from "../contracts/errors";
 import {
   VrpcClient,
   VrpcClientOptions,
@@ -137,8 +138,25 @@ export function createVrpcClient(options: VrpcClientOptions): VrpcClient {
         },
       };
     },
-    parseResponse: (response, context) =>
-      decodeVrpcResponsePayload(response, cborCodec, context.options.wire?.result),
+    parseResponse: async (response, context) => {
+      try {
+        return await decodeVrpcResponsePayload(response, cborCodec, context.options.wire?.result);
+      } catch (cause) {
+        const vrpcStatus = response.headers.get("vrpc-status");
+        if (vrpcStatus && (!response.ok || vrpcStatus !== "OK")) {
+          throw new VrpcInvokeError(
+            response,
+            null,
+            {
+              url: context.url,
+              method: String(context.init.method || "POST").toUpperCase(),
+            },
+            { cause },
+          );
+        }
+        throw cause;
+      }
+    },
     validateRequest: (_context, requestMeta) => {
       if (requestMeta.method !== "POST") {
         throw new Error(`Unsupported method: ${requestMeta.method}, only POST is allowed.`);

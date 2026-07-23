@@ -385,6 +385,32 @@ describe("http client", () => {
     await expect(client.request({ path: "empty" })).resolves.toBeNull();
   });
 
+  it("should decode valid JSON independently of content-type", async () => {
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      fetchImpl: (async () =>
+        new Response('{"ok":true}', {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        })) as typeof fetch,
+    });
+
+    await expect(client.request({ path: "json-as-text" })).resolves.toEqual({ ok: true });
+  });
+
+  it("should return text when a response is not valid JSON", async () => {
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      fetchImpl: (async () =>
+        new Response("not-json", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })) as typeof fetch,
+    });
+
+    await expect(client.request({ path: "invalid-json" })).resolves.toBe("not-json");
+  });
+
   it("should treat 204 no-content responses as null instead of throwing during response rebuild", async () => {
     const client = createHttpClient({
       prefixUrl: "https://example.com/api",

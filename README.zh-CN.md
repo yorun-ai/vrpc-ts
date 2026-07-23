@@ -28,7 +28,7 @@ pnpm add @yorun-ai/vrpc
 ## vRPC 快速开始
 
 ```ts
-import { VrpcInvokeError, createVrpcClient, getClientInstanceId } from "@yorun-ai/vrpc";
+import { createVrpcClient, getClientInstanceId, isVrpcError } from "@yorun-ai/vrpc";
 
 const client = createVrpcClient({
   prefixUrl: "https://api.example.com/invoke",
@@ -43,6 +43,9 @@ const client = createVrpcClient({
 
 client.use({
   onError(error, context) {
+    if (isVrpcError(error) && error.kind === "abort") {
+      return;
+    }
     if (context.options.suppressGlobalToast) {
       return;
     }
@@ -74,7 +77,7 @@ try {
     params: {},
   });
 } catch (error) {
-  if (error instanceof VrpcInvokeError) {
+  if (isVrpcError(error) && error.kind === "invoke") {
     console.error(error.status, error.vrpcStatus, error.code, error.reason);
   }
 }
@@ -189,7 +192,98 @@ await http.request({
 });
 ```
 
-HTTP interceptor 通过 `context.options` 读取合并后的请求配置。`json` 和 `body` 互斥，空响应返回 `null`。
+HTTP interceptor 通过 `context.options` 读取合并后的请求配置。`json` 和 `body` 互斥。通用 HTTP 响应采用与 `content-type` 无关的宽松解析策略：空 body 返回 `null`，合法 JSON 返回解码结果，其他 body 返回文本。
+
+## 错误处理
+
+业务只需要使用 `isVrpcError` 判断是否为 vRPC client 规范化错误，然后通过 `kind` 分类：
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+function handleError(error: unknown) {
+  if (!isVrpcError(error)) {
+    console.error(error);
+    return;
+  }
+
+  if (error.kind === "abort") {
+    return;
+  }
+
+  if (error.kind === "invoke") {
+    console.error(error.vrpcStatus, error.code, error.reason, error.message);
+    return;
+  }
+
+  console.error(error.kind, error.message, error.cause);
+}
+```
+
+vRPC 的错误 kind 包括 `abort`、`timeout`、`transport`、`invoke` 和 `protocol`。通用 HTTP 入口提供等价的 `isHttpError`，其错误 kind 包括 `abort`、`timeout`、`transport` 和 `invoke`。adapter 或 vRPC 解码产生的原始异常会保留在 `cause` 中。对于 vRPC invoke 错误，`code` 和 `reason` 仍然是服务端业务字段，非空 `detail` 仍会拼接到 `message`。
+
+错误 class 会继续导出，供兼容代码和特定测试使用；业务错误策略通常只需要 guard 和 `kind`，无需再使用 `instanceof` 二次分类。
+
+### 局部 `try/catch` 与 `suppressGlobalToast`
+
+当功能模块自行负责错误 UI 时，使用局部 `try/catch`，并为该请求设置 `suppressGlobalToast: true`，让全局 interceptor 跳过兜底 toast：
+
+```ts
+async function loadProfile() {
+  try {
+    return await client.invoke({
+      serviceName: "user.UserService",
+      methodName: "getProfile",
+      params: { userId: 1 },
+      options: { suppressGlobalToast: true },
+    });
+  } catch (error) {
+    if (!isVrpcError(error)) {
+      throw error;
+    }
+    if (error.kind === "abort") {
+      return;
+    }
+    if (error.kind === "invoke" && error.code === "USER" && error.reason === "NOT_FOUND") {
+      showToast(error.message);
+      return;
+    }
+    showToast("加载用户资料失败，请稍后重试");
+  }
+}
+```
+
+`suppressGlobalToast` 只是提供给应用 interceptor 的策略元数据，包本身不会操作 UI。它不会跳过 `onError`，也不会吞掉错误；执行顺序仍然是先运行 `onError`，随后 Promise reject 并进入局部 `catch`。单次请求的值会覆盖 client 级默认值。
+
+## 取消请求
+
+通过 `requestInit.signal` 传入 `AbortSignal`。取消请求会 reject 一个 `kind` 为 `"abort"` 的错误，不会被转换成成功的 `undefined` 结果。
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+const controller = new AbortController();
+const request = client.invoke({
+  serviceName: "user.UserService",
+  methodName: "getProfile",
+  params: { userId: 1 },
+  options: {
+    requestInit: { signal: controller.signal },
+  },
+});
+
+controller.abort();
+
+try {
+  await request;
+} catch (error) {
+  if (!(isVrpcError(error) && error.kind === "abort")) {
+    throw error;
+  }
+}
+```
+
+如果取消请求不需要展示 UI 错误，只需在全局 `onError` interceptor 中统一忽略 `abort`。超时保持为 `kind: "timeout"`，不会被误判为用户主动取消。
 
 ## 协议 helper
 

@@ -46,7 +46,22 @@ An error response has a null result and may carry a structured error:
 }
 ```
 
-The client treats a response as successful only when the HTTP status is successful and `vrpc-status` is `OK`. Other responses are unwrapped as `VrpcInvokeError`. Every response must contain valid `content-type`, `vrpc-status`, and `vrpc-server` headers; a JSON body must be non-empty and parseable.
+The client treats a response as successful only when the HTTP status is successful and `vrpc-status` is `OK`. `vrpc-status` is the authoritative vRPC outcome; the body `error` supplies auxiliary `type`, `code`, `reason`, `message`, and `detail` fields. The runtime does not infer success from body fields or require `result` and `error` to form a strictly validated mutually exclusive envelope.
+
+Other responses are unwrapped as `VrpcInvokeError`. If a response already carries a failing `vrpc-status` but its body or auxiliary protocol metadata cannot be decoded, it remains a `VrpcInvokeError` with `payload: null`, while the decoding failure is preserved as `cause`. Every response must contain valid `content-type`, `vrpc-status`, and `vrpc-server` headers; a JSON body must be non-empty and parseable. A missing `vrpc-status`, or an otherwise undecodable successful response, produces `VrpcProtocolError` with the HTTP response metadata intact.
+
+### Error message construction
+
+`VrpcInvokeError.message` deliberately combines the auxiliary body fields `message` and `detail`. When `message` is a non-empty string and trimmed `detail` is non-empty, the runtime produces:
+
+```text
+<message>
+<detail>
+```
+
+The newline keeps the primary human-readable summary separate from the additional diagnostic or explanatory text while preserving both in ordinary logs, error boundaries, and UI fallbacks that display only `Error.message`. This behavior also preserves compatibility for applications that already surface the combined message.
+
+The combined text is presentation data, not a classification contract. Applications must use `vrpc-status` for the protocol outcome and `code` plus `reason` for business branching; they must not parse `message` or `detail`. If the body has no usable `message`, the runtime falls back to the HTTP status-based error message.
 
 ## Content negotiation
 
