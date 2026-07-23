@@ -1,41 +1,77 @@
-import { HttpTimeoutError } from "../contracts/errors";
+import {
+  HttpAbortError,
+  HttpTimeoutError,
+  HttpTransportError,
+  isAbortErrorLike,
+  isHttpError,
+} from "../contracts/errors";
 import { HttpTransport } from "../contracts/types";
 import { shouldTreatResponseAsBodyless } from "../core/http-utils";
 
-function createTimeoutError(timeoutMs: number) {
-  return new HttpTimeoutError(timeoutMs);
-}
+type AbortSource = "caller" | "timeout";
 
 function withTimeoutSignal(
   timeoutMs: number | undefined,
-  signal: AbortSignal | null | undefined,
-): { signal: AbortSignal | undefined; cleanup: () => void } {
+  callerSignal: AbortSignal | null | undefined,
+  requestMeta: { url: string; method: string },
+): {
+  signal: AbortSignal | undefined;
+  cleanup: () => void;
+  getAbortSource: () => AbortSource | undefined;
+  getTimeoutError: () => HttpTimeoutError | undefined;
+} {
   if (!timeoutMs || timeoutMs <= 0) {
-    return { signal: signal || undefined, cleanup: () => {} };
+    return {
+      signal: callerSignal || undefined,
+      cleanup: () => {},
+      getAbortSource: () => (callerSignal?.aborted ? "caller" : undefined),
+      getTimeoutError: () => undefined,
+    };
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(createTimeoutError(timeoutMs)), timeoutMs);
+  let abortSource: AbortSource | undefined;
+  let timeoutError: HttpTimeoutError | undefined;
+  const timer = setTimeout(() => {
+    if (controller.signal.aborted) {
+      return;
+    }
+    abortSource = "timeout";
+    timeoutError = new HttpTimeoutError(timeoutMs, requestMeta);
+    controller.abort(timeoutError);
+  }, timeoutMs);
   const clear = () => clearTimeout(timer);
 
-  if (!signal) {
-    return { signal: controller.signal, cleanup: clear };
+  if (!callerSignal) {
+    return {
+      signal: controller.signal,
+      cleanup: clear,
+      getAbortSource: () => abortSource,
+      getTimeoutError: () => timeoutError,
+    };
   }
 
-  if (signal.aborted) {
-    controller.abort((signal as { reason?: unknown }).reason);
-    return { signal: controller.signal, cleanup: clear };
+  const relayAbort = () => {
+    if (controller.signal.aborted) {
+      return;
+    }
+    abortSource = "caller";
+    controller.abort(callerSignal.reason);
+  };
+  if (callerSignal.aborted) {
+    relayAbort();
+  } else {
+    callerSignal.addEventListener("abort", relayAbort, { once: true });
   }
-
-  const relayAbort = () => controller.abort((signal as { reason?: unknown }).reason);
-  signal.addEventListener("abort", relayAbort, { once: true });
 
   return {
     signal: controller.signal,
     cleanup: () => {
       clear();
-      signal.removeEventListener("abort", relayAbort);
+      callerSignal.removeEventListener("abort", relayAbort);
     },
+    getAbortSource: () => abortSource,
+    getTimeoutError: () => timeoutError,
   };
 }
 
@@ -47,9 +83,12 @@ export function createFetchTransport(fetchImpl?: typeof fetch): HttpTransport {
 
   return {
     request: async (input) => {
-      const { signal, cleanup } = withTimeoutSignal(
+      const requestMeta = { url: input.url, method: input.method };
+      const callerSignal = input.init.signal || input.signal;
+      const { signal, cleanup, getAbortSource, getTimeoutError } = withTimeoutSignal(
         input.timeoutMs,
-        input.init.signal || input.signal,
+        callerSignal,
+        requestMeta,
       );
       try {
         const response = await request(input.url, {
@@ -70,6 +109,28 @@ export function createFetchTransport(fetchImpl?: typeof fetch): HttpTransport {
           body,
           url: response.url || input.url,
         };
+      } catch (cause) {
+        const abortSource = getAbortSource();
+        if (abortSource === "timeout") {
+          const timeoutError = getTimeoutError();
+          if (cause === timeoutError && timeoutError) {
+            throw timeoutError;
+          }
+          throw new HttpTimeoutError(input.timeoutMs as number, requestMeta, { cause });
+        }
+        if (abortSource === "caller") {
+          throw new HttpAbortError(requestMeta, {
+            cause,
+            reason: callerSignal?.reason,
+          });
+        }
+        if (isHttpError(cause)) {
+          throw cause;
+        }
+        if (isAbortErrorLike(cause)) {
+          throw new HttpAbortError(requestMeta, { cause });
+        }
+        throw new HttpTransportError(requestMeta, { cause });
       } finally {
         cleanup();
       }

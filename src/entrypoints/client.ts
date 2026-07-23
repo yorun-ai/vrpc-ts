@@ -38,11 +38,25 @@ export type {
 
 export {
   HTTP_TIMEOUT_ERROR_CODE,
+  HttpAbortError,
+  HttpClientError,
   HttpInvokeError,
   HttpTimeoutError,
+  HttpTransportError,
   VrpcInvokeError,
+  VrpcProtocolError,
+  isVrpcError,
 } from "../contracts/errors";
-export type { HttpErrorPayload, VrpcErrorPayload } from "../contracts/errors";
+export type {
+  HttpAbortErrorOptions,
+  HttpClientErrorKind,
+  HttpClientErrorOptions,
+  HttpError,
+  HttpErrorPayload,
+  HttpErrorRequestMeta,
+  VrpcError,
+  VrpcErrorPayload,
+} from "../contracts/errors";
 export {
   generateVrpcId,
   generateVrpcSpan,

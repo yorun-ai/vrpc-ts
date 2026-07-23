@@ -1,7 +1,7 @@
 # @yorun-ai/vrpc
 
 [![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
-[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&color=cb3837)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm)](https://www.npmjs.com/package/@yorun-ai/vrpc)
 [![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
 
 **English** | [简体中文](README.zh-CN.md)
@@ -28,7 +28,7 @@ pnpm add @yorun-ai/vrpc
 ## vRPC quick start
 
 ```ts
-import { VrpcInvokeError, createVrpcClient, getClientInstanceId } from "@yorun-ai/vrpc";
+import { createVrpcClient, getClientInstanceId, isVrpcError } from "@yorun-ai/vrpc";
 
 const client = createVrpcClient({
   prefixUrl: "https://api.example.com/invoke",
@@ -43,6 +43,9 @@ const client = createVrpcClient({
 
 client.use({
   onError(error, context) {
+    if (isVrpcError(error) && error.kind === "abort") {
+      return;
+    }
     if (context.options.suppressGlobalToast) {
       return;
     }
@@ -74,7 +77,7 @@ try {
     params: {},
   });
 } catch (error) {
-  if (error instanceof VrpcInvokeError) {
+  if (isVrpcError(error) && error.kind === "invoke") {
     console.error(error.status, error.vrpcStatus, error.code, error.reason);
   }
 }
@@ -189,7 +192,100 @@ await http.request({
 });
 ```
 
-HTTP interceptors read merged request configuration from `context.options`. `json` and `body` are mutually exclusive, and an empty response returns `null`.
+HTTP interceptors read merged request configuration from `context.options`. `json` and `body` are mutually exclusive. Generic HTTP response parsing is intentionally lenient and independent of `content-type`: an empty body returns `null`, valid JSON is decoded, and any other body is returned as text.
+
+Request paths are relative to `prefixUrl` by default. Absolute request URLs are rejected before transport so an untrusted `path` cannot redirect client-level headers to another origin. For a trusted use case that requires complete URLs, set `allowAbsoluteUrls: true` when creating the HTTP client. This opt-in accepts only `http:` and `https:` URLs, continues to send the configured headers to the selected URL, and does not permit protocol-relative URLs such as `//example.com/path`.
+
+## Error handling
+
+Use the single `isVrpcError` guard, then classify a normalized vRPC client error by `kind`:
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+function handleError(error: unknown) {
+  if (!isVrpcError(error)) {
+    console.error(error);
+    return;
+  }
+
+  if (error.kind === "abort") {
+    return;
+  }
+
+  if (error.kind === "invoke") {
+    console.error(error.vrpcStatus, error.code, error.reason, error.message);
+    return;
+  }
+
+  console.error(error.kind, error.message, error.cause);
+}
+```
+
+The vRPC error kinds are `abort`, `timeout`, `transport`, `invoke`, and `protocol`. The generic HTTP entry point provides the equivalent `isHttpError` guard with `abort`, `timeout`, `transport`, and `invoke`. Original adapter or vRPC decoding errors are preserved in `cause`. For vRPC invoke errors, `code` and `reason` remain server-defined business fields, and `message` continues to include a non-empty `detail`.
+
+Error classes remain exported for compatibility and specialized tests, but application policy normally needs only the guard and `kind`.
+
+### Local `try/catch` and `suppressGlobalToast`
+
+Use a local `try/catch` when a feature owns the error UI. Set `suppressGlobalToast: true` on that request so the global interceptor can skip its fallback toast:
+
+```ts
+async function loadProfile() {
+  try {
+    return await client.invoke({
+      serviceName: "user.UserService",
+      methodName: "getProfile",
+      params: { userId: 1 },
+      options: { suppressGlobalToast: true },
+    });
+  } catch (error) {
+    if (!isVrpcError(error)) {
+      throw error;
+    }
+    if (error.kind === "abort") {
+      return;
+    }
+    if (error.kind === "invoke" && error.code === "USER" && error.reason === "NOT_FOUND") {
+      showToast(error.message);
+      return;
+    }
+    showToast("Unable to load the profile. Please try again.");
+  }
+}
+```
+
+`suppressGlobalToast` is only metadata for application interceptors; the package does not operate UI itself. It does not skip `onError` or consume the error. The lifecycle remains `onError` first, followed by Promise rejection and the local `catch`. A per-request value overrides the client-level default.
+
+## Cancel requests
+
+Pass an `AbortSignal` through `requestInit.signal`. Cancellation rejects with an error whose `kind` is `"abort"`; it is not converted into a successful `undefined` result.
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+const controller = new AbortController();
+const request = client.invoke({
+  serviceName: "user.UserService",
+  methodName: "getProfile",
+  params: { userId: 1 },
+  options: {
+    requestInit: { signal: controller.signal },
+  },
+});
+
+controller.abort();
+
+try {
+  await request;
+} catch (error) {
+  if (!(isVrpcError(error) && error.kind === "abort")) {
+    throw error;
+  }
+}
+```
+
+Handle `abort` once in a global `onError` interceptor when cancellation should be silent in the UI. Timeouts remain `kind: "timeout"` and are not treated as caller cancellation.
 
 ## Protocol helpers
 

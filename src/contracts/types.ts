@@ -24,6 +24,7 @@ export type HttpRequestConfig = {
 
 export type HttpClientOptions = HttpRequestOptions & {
   prefixUrl: string | URL;
+  allowAbsoluteUrls?: boolean;
   fetchImpl?: typeof fetch;
   transport?: HttpTransport;
   interceptors?: HttpInterceptor[];
@@ -164,7 +165,10 @@ export interface VrpcRequestOptions extends HttpRequestOptions {
   wire?: VrpcMethodWireSpec;
 }
 
-export type VrpcClientOptions = Omit<HttpClientOptions, "interceptors" | "transport"> & {
+export type VrpcClientOptions = Omit<
+  HttpClientOptions,
+  "allowAbsoluteUrls" | "interceptors" | "transport"
+> & {
   clientInfo: VrpcClientInfo;
   traceMode?: VrpcTraceMode;
   cborCodec?: VrpcCborCodec;

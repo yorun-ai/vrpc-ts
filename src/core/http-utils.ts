@@ -13,10 +13,39 @@ export function normalizeBaseUrl(input: string | URL) {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
-export function buildRequestUrl(prefixUrl: string | URL, path: string) {
+type BuildRequestUrlOptions = {
+  allowAbsoluteUrls?: boolean;
+};
+
+const ALLOWED_ABSOLUTE_URL_PROTOCOLS = new Set(["http:", "https:"]);
+
+export function buildRequestUrl(
+  prefixUrl: string | URL,
+  path: string,
+  { allowAbsoluteUrls = false }: BuildRequestUrlOptions = {},
+) {
+  if (/^\s*\/\//.test(path)) {
+    throw new Error("Protocol-relative request URLs are not supported.");
+  }
+
+  let absoluteUrl: URL | undefined;
   try {
-    return new URL(path).toString();
+    absoluteUrl = new URL(path);
   } catch {}
+
+  if (absoluteUrl) {
+    if (!ALLOWED_ABSOLUTE_URL_PROTOCOLS.has(absoluteUrl.protocol)) {
+      throw new Error(
+        `Unsupported absolute request URL protocol: ${absoluteUrl.protocol || "unknown"}`,
+      );
+    }
+    if (!allowAbsoluteUrls) {
+      throw new Error(
+        "Absolute request URLs are disabled. Set allowAbsoluteUrls: true on createHttpClient() to enable them.",
+      );
+    }
+    return absoluteUrl.toString();
+  }
 
   const base = String(prefixUrl).replace(/\/+$/, "");
   const relativePath = path.replace(/^\/+/, "");

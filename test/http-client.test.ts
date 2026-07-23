@@ -32,6 +32,92 @@ describe("http client", () => {
     expect(calls).toEqual([{ url: "https://example.com/api/users/me", method: "GET" }]);
   });
 
+  it("should reject absolute request urls by default before transport", async () => {
+    let transportCalled = false;
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      transport: {
+        request: async (request) => {
+          transportCalled = true;
+          return {
+            status: 200,
+            headers: new Headers(),
+            body: textBody(JSON.stringify({ ok: true })),
+            url: request.url,
+          };
+        },
+      },
+    });
+
+    await expect(client.request({ path: "https://other.example.com/users/me" })).rejects.toThrow(
+      "Absolute request URLs are disabled. Set allowAbsoluteUrls: true on createHttpClient() to enable them.",
+    );
+    expect(transportCalled).toBe(false);
+  });
+
+  it("should allow absolute http urls only when explicitly enabled", async () => {
+    const calls: string[] = [];
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      allowAbsoluteUrls: true,
+      transport: {
+        request: async (request) => {
+          calls.push(request.url);
+          return {
+            status: 200,
+            headers: new Headers(),
+            body: textBody(JSON.stringify({ ok: true })),
+            url: request.url,
+          };
+        },
+      },
+    });
+
+    await client.request({
+      path: "https://uploads.example.com/files?source=profile#preview",
+      query: { download: true },
+    });
+
+    expect(calls).toEqual([
+      "https://uploads.example.com/files?source=profile&download=true#preview",
+    ]);
+  });
+
+  it.each(["data:text/plain,test", "file:///tmp/test", "ftp://example.com/test"])(
+    "should reject unsupported absolute request url %s",
+    async (path) => {
+      const client = createHttpClient({
+        prefixUrl: "https://example.com/api",
+        allowAbsoluteUrls: true,
+        transport: {
+          request: async () => {
+            throw new Error("transport should not run");
+          },
+        },
+      });
+
+      await expect(client.request({ path })).rejects.toThrow(
+        /^Unsupported absolute request URL protocol:/,
+      );
+    },
+  );
+
+  it("should reject protocol-relative request urls even when absolute urls are enabled", async () => {
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      allowAbsoluteUrls: true,
+      transport: {
+        request: async () => {
+          throw new Error("transport should not run");
+        },
+      },
+    });
+
+    await expect(client.request({ path: "//other.example.com/users/me" })).rejects.toThrow(
+      "Protocol-relative request URLs are not supported.",
+    );
+  });
+
   it("should serialize query params and keep existing path query", async () => {
     const calls: Array<{ url: string; method: string }> = [];
     const client = createHttpClient({
@@ -383,6 +469,32 @@ describe("http client", () => {
     });
 
     await expect(client.request({ path: "empty" })).resolves.toBeNull();
+  });
+
+  it("should decode valid JSON independently of content-type", async () => {
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      fetchImpl: (async () =>
+        new Response('{"ok":true}', {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        })) as typeof fetch,
+    });
+
+    await expect(client.request({ path: "json-as-text" })).resolves.toEqual({ ok: true });
+  });
+
+  it("should return text when a response is not valid JSON", async () => {
+    const client = createHttpClient({
+      prefixUrl: "https://example.com/api",
+      fetchImpl: (async () =>
+        new Response("not-json", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })) as typeof fetch,
+    });
+
+    await expect(client.request({ path: "invalid-json" })).resolves.toBe("not-json");
   });
 
   it("should treat 204 no-content responses as null instead of throwing during response rebuild", async () => {

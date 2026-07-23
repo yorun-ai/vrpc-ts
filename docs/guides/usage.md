@@ -3,7 +3,7 @@
 ## 1. Generic HTTP client
 
 ```ts
-import { HttpInvokeError, HttpTimeoutError, createHttpClient } from "@yorun-ai/vrpc/http";
+import { createHttpClient, isHttpError } from "@yorun-ai/vrpc/http";
 
 const client = createHttpClient({
   prefixUrl: "https://api.example.com",
@@ -19,6 +19,9 @@ client.use({
     console.log(context.url, context.init.method);
   },
   onError(error, context) {
+    if (isHttpError(error) && error.kind === "abort") {
+      return;
+    }
     if (context.options.suppressGlobalToast) {
       return;
     }
@@ -66,17 +69,20 @@ client.request({
 - `json` and `body` are mutually exclusive.
 - `json` is serialized automatically and adds `content-type: application/json`.
 - Pass `FormData` through `body`; do not set its content-type boundary manually.
+- `path` is relative to `prefixUrl` by default. Absolute request URLs are rejected before transport.
+- Set create-time `allowAbsoluteUrls: true` only for trusted complete URLs. The opt-in accepts `http:` and `https:`, forwards configured headers to the selected URL, and still rejects protocol-relative URLs such as `//example.com/path`.
 - Create-time defaults are merged with per-request options; per-request scalar and requestInit fields take precedence.
 - An interceptor receives merged configuration in `context.options` and the original call shape in `context.request`.
 - Options do not leak into the transport request.
 - `timeoutMs` is disabled by default. Set an application default at creation and override it per request when needed.
 - The default is `credentials: "omit"`; use `requestInit.credentials: "include"` for cookies.
-- An empty body returns `null`; a timeout throws `HttpTimeoutError`; a non-2xx response throws `HttpInvokeError`.
+- Response parsing is intentionally lenient and independent of `content-type`: an empty body returns `null`, valid JSON is decoded, and any other body is returned as text.
+- A timeout throws `HttpTimeoutError`; a non-2xx response throws `HttpInvokeError`.
 
 ## 2. vRPC client
 
 ```ts
-import { VrpcInvokeError, createVrpcClient, getClientInstanceId } from "@yorun-ai/vrpc/client";
+import { createVrpcClient, getClientInstanceId, isVrpcError } from "@yorun-ai/vrpc/client";
 
 const client = createVrpcClient({
   prefixUrl: "https://api.example.com/invoke",
@@ -91,13 +97,19 @@ const client = createVrpcClient({
 
 client.use({
   onError(error, context) {
+    if (isVrpcError(error) && error.kind === "abort") {
+      return;
+    }
     if (context.options.suppressGlobalToast) {
       return;
     }
 
-    if (error instanceof VrpcInvokeError) {
+    if (isVrpcError(error) && error.kind === "invoke") {
       console.error(error.status, error.vrpcStatus, error.code, error.reason);
+      return;
     }
+
+    console.error(error);
   },
 });
 
@@ -158,7 +170,155 @@ options: {
 
 `timeoutMs` is disabled by default. Setting `timeoutMs: 2500` creates both a local timeout and `vrpc-options: timeout=2500ms`. The create-time value is the client default and may be overridden per call; a vRPC timeout must be a positive safe integer.
 
-## 3. Automatic CBOR
+## 3. Error handling
+
+The vRPC entry point exposes one client-level guard, `isVrpcError`. After it succeeds, use only the discriminating `kind` field for error policy and server business fields:
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+function handleVrpcError(error: unknown) {
+  if (!isVrpcError(error)) {
+    console.error("Unexpected error", error);
+    return;
+  }
+
+  switch (error.kind) {
+    case "abort":
+      return;
+    case "timeout":
+      console.error(`Request timed out after ${error.timeoutMs}ms`);
+      return;
+    case "transport":
+      console.error("Network request failed", error.cause);
+      return;
+    case "invoke":
+      console.error(error.status, error.vrpcStatus, error.code, error.reason, error.message);
+      return;
+    case "protocol":
+      console.error("Invalid vRPC response", error.cause);
+      return;
+  }
+}
+```
+
+The generic HTTP entry point exposes the equivalent `isHttpError` guard. Both guards recognize only normalized errors produced by this package; compatibility handling for native Fetch and custom adapter errors stays inside the transport boundary. Error classes remain available for compatibility and specialized tests, but ordinary application code does not need a second `instanceof` check after the guard.
+
+| `kind`      | Client        | Meaning                                                                                    |
+| ----------- | ------------- | ------------------------------------------------------------------------------------------ |
+| `abort`     | HTTP and vRPC | The caller canceled through an `AbortSignal`. Usually silent in the UI.                    |
+| `timeout`   | HTTP and vRPC | The configured client timeout expired.                                                     |
+| `transport` | HTTP and vRPC | No usable HTTP response was received. The original adapter error is available as `cause`.  |
+| `invoke`    | HTTP and vRPC | The server rejected the invocation. vRPC errors expose `vrpcStatus`, `code`, and `reason`. |
+| `protocol`  | vRPC only     | Required vRPC metadata is missing, or a successful response cannot be decoded.             |
+
+`VrpcInvokeError` uses `vrpc-status` as the authoritative vRPC outcome. The body error is auxiliary: `code` identifies the business category, `reason` identifies a more specific case, and a non-empty `detail` remains appended to `message`. If a failed vRPC response has an undecodable body, the client still throws `VrpcInvokeError` and records the decoding failure in `cause`.
+
+An interceptor `onError` observes the error but does not consume it; the request promise still rejects. Put the `abort` check before logging or global toast logic when caller cancellation should be quiet.
+
+Recommended application policy:
+
+- Handle `abort` once in the global `onError` interceptor and show no error UI.
+- Handle `timeout`, `transport`, and `protocol` globally with a stable user-facing message; retain `cause` for logging or reporting rather than displaying it directly.
+- Branch on expected `invoke` values such as `code` and `reason` near the feature that understands them. Use `suppressGlobalToast` when that feature owns the UI, preventing duplicate messages.
+- Treat values that fail `isVrpcError` as configuration, interceptor, or other unexpected application errors; do not silently classify them as network failures.
+
+### Global `onError` and local `try/catch`
+
+Global and local handlers have different responsibilities. A global `onError` interceptor is suitable for shared logging, reporting, and fallback UI. A local `try/catch` is suitable for an expected business outcome that the current feature can explain or recover from.
+
+```ts
+client.use({
+  onError(error, context) {
+    if (isVrpcError(error) && error.kind === "abort") {
+      return;
+    }
+
+    reportError(error);
+
+    if (!context.options.suppressGlobalToast) {
+      showToast("Request failed. Please try again.");
+    }
+  },
+});
+
+async function loadProfile() {
+  try {
+    return await client.invoke({
+      serviceName: "user.UserService",
+      methodName: "getProfile",
+      params: { userId: 1 },
+      options: {
+        // This feature owns the error UI shown in the catch block below.
+        suppressGlobalToast: true,
+      },
+    });
+  } catch (error) {
+    if (!isVrpcError(error)) {
+      throw error;
+    }
+
+    if (error.kind === "abort") {
+      return;
+    }
+
+    if (error.kind === "invoke" && error.code === "USER" && error.reason === "NOT_FOUND") {
+      showToast(error.message);
+      return;
+    }
+
+    // suppressGlobalToast also suppressed the global fallback, so keep a local fallback.
+    showToast("Unable to load the profile. Please try again.");
+  }
+}
+```
+
+For transport and response failures, the lifecycle is:
+
+```text
+request fails -> onError runs -> the Promise rejects -> local catch runs
+```
+
+`onError` should perform side effects and complete normally. It does not turn a failed request into a successful result; after the interceptors complete, the request Promise still rejects.
+
+`suppressGlobalToast` is policy metadata for application interceptors. The package does not display or suppress UI by itself. Setting it to `true` does not skip `onError`, logging, or Promise rejection; it only has an effect when an interceptor reads `context.options.suppressGlobalToast`. A per-request `true` or `false` overrides the client-level default. Set it to `true` only when the local caller owns a complete error experience, including a fallback for errors it does not specifically recognize.
+
+Request-construction errors that occur before an interceptor context exists, such as invalid configuration, reject directly and may only reach the local `catch`. The same global/local pattern applies to the generic HTTP client with `isHttpError`.
+
+## 4. Cancel requests
+
+Both clients accept an `AbortSignal` through `requestInit.signal`:
+
+```ts
+import { isVrpcError } from "@yorun-ai/vrpc";
+
+const controller = new AbortController();
+const request = client.invoke({
+  serviceName: "user.UserService",
+  methodName: "getUser",
+  params: { userId: 1 },
+  options: {
+    requestInit: { signal: controller.signal },
+  },
+});
+
+// For example: the user closes a dialog or navigates away.
+controller.abort();
+
+try {
+  await request;
+} catch (error) {
+  if (!(isVrpcError(error) && error.kind === "abort")) {
+    throw error;
+  }
+}
+```
+
+Cancellation remains a rejected promise so frameworks and callers can finish loading-state cleanup. The normalized error preserves a custom `controller.abort(reason)` value as `reason` and the underlying runtime error as `cause`. A single controller may cancel multiple requests that share its signal. Aborting after a request has settled has no effect.
+
+Timeouts may also use `AbortController` internally, but they remain `kind: "timeout"`; applications should not silently treat them as caller cancellation.
+
+## 5. Automatic CBOR
 
 A generated method without Binary has no wire and uses JSON. A method whose arguments or result contain Binary includes the corresponding schema:
 
@@ -214,7 +374,7 @@ Selection depends entirely on wire-property presence:
 
 Wire never appears in the HTTP body, custom headers, or transport request.
 
-## 4. Protocol helpers
+## 6. Protocol helpers
 
 ```ts
 import {
@@ -237,7 +397,7 @@ const body = buildVrpcRequestBody({ userId: 1 });
 
 `parseVrpcResponse` returns a normalized result without throwing; `unwrapVrpcResponse` throws `VrpcInvokeError` on failure. A fully custom HTTP client is responsible for JSON/CBOR decoding of the response body; `createVrpcClient` handles it when using a runtime transport.
 
-## 5. Custom transport
+## 7. Custom transport
 
 A transport performs I/O only, and the response body must remain raw bytes:
 

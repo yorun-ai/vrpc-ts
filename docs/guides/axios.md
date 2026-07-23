@@ -59,31 +59,52 @@ A runtime transport returns the response body as raw bytes:
 
 ```ts
 import axios from "axios";
+import { HttpAbortError, HttpTimeoutError, HttpTransportError } from "@yorun-ai/vrpc";
 import type { VrpcTransport } from "@yorun-ai/vrpc";
 
 export const axiosTransport: VrpcTransport = {
   async request(request) {
-    const response = await axios.request<ArrayBuffer>({
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(new Headers(request.headers).entries()),
-      data: request.body,
-      signal: request.signal ?? undefined,
-      timeout: request.timeoutMs,
-      withCredentials: request.init.credentials === "include",
-      responseType: "arraybuffer",
-      validateStatus: () => true,
-    });
+    const requestMeta = { url: request.url, method: request.method };
+    try {
+      const response = await axios.request<ArrayBuffer>({
+        url: request.url,
+        method: request.method,
+        headers: Object.fromEntries(new Headers(request.headers).entries()),
+        data: request.body,
+        signal: request.signal ?? undefined,
+        timeout: request.timeoutMs,
+        withCredentials: request.init.credentials === "include",
+        responseType: "arraybuffer",
+        validateStatus: () => true,
+      });
 
-    const body = response.data.byteLength ? new Uint8Array(response.data) : null;
+      const body = response.data.byteLength ? new Uint8Array(response.data) : null;
 
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: new Headers(response.headers as Record<string, string>),
-      body,
-      url: request.url,
-    };
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        headers: new Headers(response.headers as Record<string, string>),
+        body,
+        url: request.url,
+      };
+    } catch (cause) {
+      if (axios.isCancel(cause)) {
+        throw new HttpAbortError(requestMeta, {
+          cause,
+          reason: request.signal?.reason,
+        });
+      }
+
+      if (
+        request.timeoutMs !== undefined &&
+        axios.isAxiosError(cause) &&
+        (cause.code === "ECONNABORTED" || cause.code === "ETIMEDOUT")
+      ) {
+        throw new HttpTimeoutError(request.timeoutMs, requestMeta, { cause });
+      }
+
+      throw new HttpTransportError(requestMeta, { cause });
+    }
   },
 };
 ```
@@ -107,6 +128,7 @@ Constraints:
 
 - Use the complete `request.url` already calculated by the core.
 - A custom transport applies optional `request.timeoutMs` to local I/O; when omitted it is `undefined` and the runtime enables no timeout.
+- Convert adapter cancellation, timeout, and transport failures to the package error classes as shown above. The core wraps any remaining unknown transport failure as `HttpTransportError`, but only the adapter can reliably identify its own timeout codes.
 - Do not regenerate the path, headers, or envelope.
 - Do not parse JSON/CBOR or call `parseVrpcResponse`.
 - Do not read `wire` or `suppressGlobalToast`; these fields never enter the transport request.

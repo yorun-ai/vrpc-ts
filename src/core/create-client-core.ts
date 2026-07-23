@@ -1,4 +1,11 @@
-import { HttpRequestInit, HttpTransport } from "../contracts/types";
+import {
+  HttpAbortError,
+  HttpTransportError,
+  isAbortErrorLike,
+  isHttpError,
+  isVrpcError,
+} from "../contracts/errors";
+import { HttpRequestInit, HttpTransport, HttpTransportResponse } from "../contracts/types";
 import { createFetchTransport } from "../transports/fetch-transport";
 import { parseResponsePayload } from "./http-utils";
 import {
@@ -145,15 +152,29 @@ export function createClientCore<
         url: context.url,
       };
       await validateRequest?.(context, requestMeta);
-      const result = await httpTransport.request({
-        url: context.url,
-        init: context.init,
-        method,
-        headers,
-        body: resolveTransportBody(context.init, prepared.fallbackBody),
-        timeoutMs: prepared.timeoutMs,
-        signal: context.init.signal,
-      });
+      let result: HttpTransportResponse;
+      try {
+        result = await httpTransport.request({
+          url: context.url,
+          init: context.init,
+          method,
+          headers,
+          body: resolveTransportBody(context.init, prepared.fallbackBody),
+          timeoutMs: prepared.timeoutMs,
+          signal: context.init.signal,
+        });
+      } catch (cause) {
+        if (isHttpError(cause) || isVrpcError(cause)) {
+          throw cause;
+        }
+        if (context.init.signal?.aborted || isAbortErrorLike(cause)) {
+          throw new HttpAbortError(requestMeta, {
+            cause,
+            reason: context.init.signal?.reason,
+          });
+        }
+        throw new HttpTransportError(requestMeta, { cause });
+      }
       const response = buildResponseFromTransportResult(result);
       const payload = await parseResponse(response, context);
       await runAfterResponseInterceptors(interceptors, response, context);

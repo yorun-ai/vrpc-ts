@@ -1,6 +1,6 @@
 {
   "name": "@yorun-ai/vrpc",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "vRPC and HTTP request library",
   "homepage": "https://github.com/yorun-ai/vrpc-ts#readme",
   "bugs": {

@@ -23,7 +23,14 @@ function resolveJsonBody(request: HttpRequestConfig) {
 }
 
 export function createHttpClient(options: HttpClientOptions): HttpClient {
-  const { prefixUrl, fetchImpl, transport, interceptors, ...baseOptions } = options;
+  const {
+    prefixUrl,
+    allowAbsoluteUrls = false,
+    fetchImpl,
+    transport,
+    interceptors,
+    ...baseOptions
+  } = options;
   const core = createClientCore<
     HttpRequestOptions,
     SplitHttpRequestOptionsResult,
@@ -40,7 +47,10 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     prepareRequest: (request, helpers) => {
       const requestOptions = helpers.splitRequestOptions(request.options);
       const method = String(request.method || "GET").toUpperCase();
-      const url = appendQueryToUrl(buildRequestUrl(helpers.prefixUrl, request.path), request.query);
+      const url = appendQueryToUrl(
+        buildRequestUrl(helpers.prefixUrl, request.path, { allowAbsoluteUrls }),
+        request.query,
+      );
       const finalHeaders = mergeHeaders(helpers.baseOptions.headers, requestOptions.headers);
       const body = resolveJsonBody(request);
       if (request.json !== undefined && !finalHeaders.has("content-type")) {
