@@ -20,10 +20,11 @@ A transport response must preserve the original `Uint8Array | null`. The generic
 ## Generic HTTP flow
 
 1. Create options define defaults for headers, timeout, requestInit, and suppressGlobalToast. Timeout has no built-in default, so the built-in transport creates no local timer unless configured.
-2. Per-request `request.options` override defaults. Headers are merged, requestInit is shallow-merged, and per-request scalar values take precedence.
-3. Interceptors receive `{ url, init, request, options }`; `options` contains the merged configuration.
-4. The transport sends the request and returns raw bytes.
-5. The core reconstructs a `Response`, parses JSON, text, or an empty response, and throws `HttpInvokeError` for a non-success status.
+2. Request paths are joined to `prefixUrl`. Absolute paths are rejected before transport unless the HTTP client was created with `allowAbsoluteUrls: true`; the opt-in permits only HTTP(S), while protocol-relative URLs remain invalid. This policy is HTTP-only and does not constrain a vRPC client's `prefixUrl`.
+3. Per-request `request.options` override defaults. Headers are merged, requestInit is shallow-merged, and per-request scalar values take precedence.
+4. Interceptors receive `{ url, init, request, options }`; `options` contains the merged configuration.
+5. The transport sends the request and returns raw bytes.
+6. The core reconstructs a `Response`, parses JSON, text, or an empty response, and throws `HttpInvokeError` for a non-success status.
 
 Request options and interceptor-only fields must not enter `HttpTransportRequest`.
 

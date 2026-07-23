@@ -1,7 +1,7 @@
 # @yorun-ai/vrpc
 
 [![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
-[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&color=cb3837)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm)](https://www.npmjs.com/package/@yorun-ai/vrpc)
 [![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
 
 **English** | [简体中文](README.zh-CN.md)
@@ -193,6 +193,8 @@ await http.request({
 ```
 
 HTTP interceptors read merged request configuration from `context.options`. `json` and `body` are mutually exclusive. Generic HTTP response parsing is intentionally lenient and independent of `content-type`: an empty body returns `null`, valid JSON is decoded, and any other body is returned as text.
+
+Request paths are relative to `prefixUrl` by default. Absolute request URLs are rejected before transport so an untrusted `path` cannot redirect client-level headers to another origin. For a trusted use case that requires complete URLs, set `allowAbsoluteUrls: true` when creating the HTTP client. This opt-in accepts only `http:` and `https:` URLs, continues to send the configured headers to the selected URL, and does not permit protocol-relative URLs such as `//example.com/path`.
 
 ## Error handling
 

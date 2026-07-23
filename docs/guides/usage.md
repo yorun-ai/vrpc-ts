@@ -69,6 +69,8 @@ client.request({
 - `json` and `body` are mutually exclusive.
 - `json` is serialized automatically and adds `content-type: application/json`.
 - Pass `FormData` through `body`; do not set its content-type boundary manually.
+- `path` is relative to `prefixUrl` by default. Absolute request URLs are rejected before transport.
+- Set create-time `allowAbsoluteUrls: true` only for trusted complete URLs. The opt-in accepts `http:` and `https:`, forwards configured headers to the selected URL, and still rejects protocol-relative URLs such as `//example.com/path`.
 - Create-time defaults are merged with per-request options; per-request scalar and requestInit fields take precedence.
 - An interceptor receives merged configuration in `context.options` and the original call shape in `context.request`.
 - Options do not leak into the transport request.

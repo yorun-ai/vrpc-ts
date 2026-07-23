@@ -1,7 +1,7 @@
 # @yorun-ai/vrpc
 
 [![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
-[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&color=cb3837)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm)](https://www.npmjs.com/package/@yorun-ai/vrpc)
 [![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
 
 [English](README.md) | **简体中文**
@@ -193,6 +193,8 @@ await http.request({
 ```
 
 HTTP interceptor 通过 `context.options` 读取合并后的请求配置。`json` 和 `body` 互斥。通用 HTTP 响应采用与 `content-type` 无关的宽松解析策略：空 body 返回 `null`，合法 JSON 返回解码结果，其他 body 返回文本。
+
+请求 `path` 默认只能相对于 `prefixUrl`。绝对请求 URL 会在进入 transport 前被拒绝，避免不可信的 `path` 把 client 级 Header 转发到其他 origin。确实需要完整 URL 且输入可信时，可以在创建 HTTP client 时设置 `allowAbsoluteUrls: true`。该显式选项只接受 `http:` 和 `https:` URL，并会继续向目标 URL 发送已配置的 Header；`//example.com/path` 形式的协议相对 URL 始终不允许。
 
 ## 错误处理
 
