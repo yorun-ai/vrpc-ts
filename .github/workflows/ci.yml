@@ -58,7 +58,7 @@ jobs:
         run: pnpm test:package
 
   ci-checks:
-    name: CI / Checks
+    name: CI / Required Checks
     if: ${{ always() }}
     needs: [verify]
     runs-on: ubuntu-latest
