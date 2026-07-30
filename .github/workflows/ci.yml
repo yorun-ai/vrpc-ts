@@ -56,3 +56,14 @@ jobs:
 
       - name: Test package
         run: pnpm test:package
+
+  ci-checks:
+    name: CI / Checks
+    if: ${{ always() }}
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify CI results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "$NEEDS" | jq --exit-status 'all(.[]; .result == "success")'
