@@ -1,14 +1,15 @@
 # @yorun-ai/vrpc
 
-[![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
-[![version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm)](https://www.npmjs.com/package/@yorun-ai/vrpc)
-[![CI](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/%40yorun-ai%2Fvrpc?label=version&logo=npm&style=flat-square)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![CI](https://img.shields.io/github/actions/workflow/status/yorun-ai/vrpc-ts/ci.yml?branch=main&label=CI&logo=github&style=flat-square)](https://github.com/yorun-ai/vrpc-ts/actions/workflows/ci.yml)
+[![install size](https://img.shields.io/badge/dynamic/json?url=https://packagephobia.com/v2/api.json?p=%40yorun-ai%2Fvrpc&query=$.install.pretty&label=install%20size&style=flat-square)](https://packagephobia.com/result?p=%40yorun-ai%2Fvrpc)
+[![npm downloads](https://img.shields.io/npm/dm/%40yorun-ai%2Fvrpc?logo=npm&style=flat-square)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![npm types](https://img.shields.io/npm/types/%40yorun-ai%2Fvrpc?style=flat-square)](https://www.npmjs.com/package/@yorun-ai/vrpc)
+[![license](https://img.shields.io/github/license/yorun-ai/vrpc-ts?style=flat-square)](https://github.com/yorun-ai/vrpc-ts/blob/main/LICENSE)
 
 **English** | [简体中文](README.zh-CN.md)
 
-A lightweight TypeScript client runtime for Vine vRPC and generic HTTP requests.
-
-Repository: [github.com/yorun-ai/vrpc-ts](https://github.com/yorun-ai/vrpc-ts)
+A lightweight TypeScript client runtime for [Vine](https://github.com/yorun-ai/vine) vRPC and generic HTTP requests.
 
 ## What is this?
 
