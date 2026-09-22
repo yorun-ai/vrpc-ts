@@ -6,13 +6,36 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Client runtime for Vine vRPC and generic HTTP requests.
+A lightweight TypeScript client runtime for Vine vRPC and generic HTTP requests.
 
 Repository: [github.com/yorun-ai/vrpc-ts](https://github.com/yorun-ai/vrpc-ts)
 
-## Stability
+## What is this?
 
-The package starts at `0.9.0`. It is ready for use, but versions below `1.0.0` do not guarantee a stable public API. Breaking API changes may be released in a new `0.x` minor version and will include migration guidance. Version `1.0.0` will mark the stable API commitment.
+The package exposes two clients that share one request runtime:
+
+- **vRPC client** — calls Vine vRPC methods over HTTP. It builds the vRPC path
+  and envelope, generates `vrpc-trace`, `vrpc-client`, and `vrpc-options`
+  headers, negotiates JSON or CBOR, and normalizes the vRPC response.
+- **Generic HTTP client** — calls ordinary HTTP APIs with shared configuration,
+  interceptors, timeouts, cancellation, and normalized errors. It knows nothing
+  about the vRPC protocol.
+
+Choose the vRPC client when your server is a Vine vRPC service. Choose the
+generic HTTP client for everything else. Both are Fetch-based and browser-first,
+and both run in any JavaScript runtime that provides `fetch`.
+
+## Features
+
+- TypeScript-first API with published types for every entry point.
+- Browser Fetch-based transport, replaceable with a custom transport.
+- Two clients: Vine vRPC and generic HTTP.
+- Client-level defaults with per-request overrides.
+- Interceptors for request, response, and error lifecycle hooks.
+- Normalized, classified errors and `AbortSignal` cancellation.
+- Optional CBOR integration through a user-provided codec, with no bundled
+  codec dependency.
+- ESM and CommonJS builds, plus browser ES module CDN usage.
 
 ## Installation
 
@@ -20,36 +43,23 @@ The package starts at `0.9.0`. It is ready for use, but versions below `1.0.0` d
 pnpm add @yorun-ai/vrpc
 ```
 
-## Entry points
+```bash
+npm install @yorun-ai/vrpc
+```
 
-- `@yorun-ai/vrpc` / `@yorun-ai/vrpc/client`: vRPC client, protocol helpers, shared transport, and types.
-- `@yorun-ai/vrpc/http`: generic HTTP client.
+## Quick start
 
-## vRPC quick start
+### 1. Invoke a vRPC method
 
 ```ts
-import { createVrpcClient, getClientInstanceId, isVrpcError } from "@yorun-ai/vrpc";
+import { createVrpcClient, getClientInstanceId } from "@yorun-ai/vrpc";
 
 const client = createVrpcClient({
   prefixUrl: "https://api.example.com/invoke",
-  timeoutMs: 15_000,
-  suppressGlobalToast: false,
   clientInfo: {
     clientName: "demo.browser",
     clientVersion: "1.0.0",
     clientInstanceId: getClientInstanceId(),
-  },
-});
-
-client.use({
-  onError(error, context) {
-    if (isVrpcError(error) && error.kind === "abort") {
-      return;
-    }
-    if (context.options.suppressGlobalToast) {
-      return;
-    }
-    console.error(error);
   },
 });
 
@@ -57,116 +67,13 @@ const profile = await client.invoke<{ id: number; name: string }>({
   serviceName: "user.UserService",
   methodName: "getProfile",
   params: { userId: 1 },
-  options: {
-    timeoutMs: 3_000,
-    suppressGlobalToast: true,
-  },
-});
-
-// An argument-free method accepts null or an empty object.
-await client.invoke({
-  serviceName: "user.UserService",
-  methodName: "ping",
-  params: null,
-});
-
-try {
-  await client.invoke({
-    serviceName: "user.UserService",
-    methodName: "missing",
-    params: {},
-  });
-} catch (error) {
-  if (isVrpcError(error) && error.kind === "invoke") {
-    console.error(error.status, error.vrpcStatus, error.code, error.reason);
-  }
-}
-```
-
-`traceMode` controls only the automatically generated `vrpc-trace` header; it does not change routing or `prefixUrl`. Use the default `"portal"` mode through Vine Portal, where the header contains only an id. For a direct connection to a vRPC service, set `traceMode: "direct"` so the runtime generates both an id and a span. Per-call `options.trace` overrides the generated value.
-
-### Request options
-
-```ts
-type VrpcRequestOptions = {
-  headers?: HeadersInit;
-  timeoutMs?: number;
-  requestInit?: Omit<RequestInit, "method" | "body" | "headers">;
-  suppressGlobalToast?: boolean;
-  trace?: { id: string; span?: string };
-  wire?: VrpcMethodWireSpec;
-};
-```
-
-- Create-time `suppressGlobalToast` is the default; a per-call `true` or `false` overrides it.
-- `timeoutMs` is disabled by default; without it, the built-in transport creates no local timeout and sends no `vrpc-options`.
-- `wire` is per-call only and never enters the HTTP payload.
-- Argument-free methods accept both `params: null` and `params: {}`.
-- The browser transport defaults to `credentials: "omit"`; use `requestInit.credentials` when cookies are needed.
-
-## Automatic CBOR
-
-The runtime has no built-in CBOR dependency. A method without `wire` always uses JSON and requires no codec. Generated clients attach a sparse wire schema when a method's arguments or result contain Binary:
-
-```ts
-import type { VrpcCborCodec, VrpcWireSchema } from "@yorun-ai/vrpc";
-
-const uploadArguments: VrpcWireSchema = {
-  kind: "object",
-  fields: {
-    content: { kind: "binary" },
-  },
-};
-
-const cborCodec: VrpcCborCodec = {
-  encode: (value) => yourCborLibrary.encode(value),
-  decode: (bytes) => yourCborLibrary.decode(bytes),
-};
-
-const client = createVrpcClient({
-  prefixUrl: "https://api.example.com/invoke",
-  clientInfo: {
-    clientName: "demo.browser",
-    clientVersion: "1.0.0",
-    clientInstanceId: getClientInstanceId(),
-  },
-  cborCodec,
-});
-
-await client.invoke({
-  serviceName: "file.FileService",
-  methodName: "upload",
-  params: { content: new Uint8Array([1, 2, 3]) },
-  options: {
-    wire: { arguments: uploadArguments },
-  },
 });
 ```
 
-Automatic selection:
+The final URL is `<prefixUrl>/<serviceName>/<methodName>`. Methods without
+arguments accept `params: null` or `params: {}`.
 
-- `wire.arguments`: the request `content-type` is `application/vrpc+cbor`.
-- `wire.result`: `accept` is `application/vrpc+cbor, application/vrpc+json`.
-- Neither: JSON.
-- Wire without `cborCodec` throws a configuration error before network I/O.
-
-`VrpcWireSchema` supports Binary, nullable, list, object, and `Map<Int|string, T>`. Binary remains raw bytes in CBOR, while an integer-keyed `Record` becomes a real integer-keyed CBOR Map.
-
-## Vine Header
-
-Generated by the runtime:
-
-```text
-content-type: application/vrpc+json
-accept: application/vrpc+json
-vrpc-trace: id=<32hex>
-vrpc-client: name=demo.browser,version=1.0.0,instanceId=<uuid>
-vrpc-options: timeout=3000ms
-```
-
-Custom `headers` cannot override `accept`, `content-type`, or any `vrpc-*` header. An explicit `timeoutMs` controls both the local `AbortController` and `vrpc-options`.
-
-## Generic HTTP client
+### 2. Call a plain HTTP API
 
 ```ts
 import { createHttpClient } from "@yorun-ai/vrpc/http";
@@ -176,14 +83,7 @@ const http = createHttpClient({
   timeoutMs: 5_000,
 });
 
-const profile = await http.request<{ id: number }>({
-  path: "/users/me",
-  query: { withProfile: true },
-  options: {
-    requestInit: { credentials: "include" },
-    suppressGlobalToast: true,
-  },
-});
+const profile = await http.request<{ id: number }>({ path: "/users/me" });
 
 await http.request({
   path: "/users",
@@ -192,140 +92,123 @@ await http.request({
 });
 ```
 
-HTTP interceptors read merged request configuration from `context.options`. `json` and `body` are mutually exclusive. Generic HTTP response parsing is intentionally lenient and independent of `content-type`: an empty body returns `null`, valid JSON is decoded, and any other body is returned as text.
+Use `json` for a JSON body and `body` for raw `BodyInit` values such as
+`FormData`.
 
-Request paths are relative to `prefixUrl` by default. Absolute request URLs are rejected before transport so an untrusted `path` cannot redirect client-level headers to another origin. For a trusted use case that requires complete URLs, set `allowAbsoluteUrls: true` when creating the HTTP client. This opt-in accepts only `http:` and `https:` URLs, continues to send the configured headers to the selected URL, and does not permit protocol-relative URLs such as `//example.com/path`.
-
-## Error handling
-
-Use the single `isVrpcError` guard, then classify a normalized vRPC client error by `kind`:
+### 3. Handle errors
 
 ```ts
 import { isVrpcError } from "@yorun-ai/vrpc";
-
-function handleError(error: unknown) {
-  if (!isVrpcError(error)) {
-    console.error(error);
-    return;
-  }
-
-  if (error.kind === "abort") {
-    return;
-  }
-
-  if (error.kind === "invoke") {
-    console.error(error.vrpcStatus, error.code, error.reason, error.message);
-    return;
-  }
-
-  console.error(error.kind, error.message, error.cause);
-}
-```
-
-The vRPC error kinds are `abort`, `timeout`, `transport`, `invoke`, and `protocol`. The generic HTTP entry point provides the equivalent `isHttpError` guard with `abort`, `timeout`, `transport`, and `invoke`. Original adapter or vRPC decoding errors are preserved in `cause`. For vRPC invoke errors, `code` and `reason` remain server-defined business fields, and `message` continues to include a non-empty `detail`.
-
-Error classes remain exported for compatibility and specialized tests, but application policy normally needs only the guard and `kind`.
-
-### Local `try/catch` and `suppressGlobalToast`
-
-Use a local `try/catch` when a feature owns the error UI. Set `suppressGlobalToast: true` on that request so the global interceptor can skip its fallback toast:
-
-```ts
-async function loadProfile() {
-  try {
-    return await client.invoke({
-      serviceName: "user.UserService",
-      methodName: "getProfile",
-      params: { userId: 1 },
-      options: { suppressGlobalToast: true },
-    });
-  } catch (error) {
-    if (!isVrpcError(error)) {
-      throw error;
-    }
-    if (error.kind === "abort") {
-      return;
-    }
-    if (error.kind === "invoke" && error.code === "USER" && error.reason === "NOT_FOUND") {
-      showToast(error.message);
-      return;
-    }
-    showToast("Unable to load the profile. Please try again.");
-  }
-}
-```
-
-`suppressGlobalToast` is only metadata for application interceptors; the package does not operate UI itself. It does not skip `onError` or consume the error. The lifecycle remains `onError` first, followed by Promise rejection and the local `catch`. A per-request value overrides the client-level default.
-
-## Cancel requests
-
-Pass an `AbortSignal` through `requestInit.signal`. Cancellation rejects with an error whose `kind` is `"abort"`; it is not converted into a successful `undefined` result.
-
-```ts
-import { isVrpcError } from "@yorun-ai/vrpc";
-
-const controller = new AbortController();
-const request = client.invoke({
-  serviceName: "user.UserService",
-  methodName: "getProfile",
-  params: { userId: 1 },
-  options: {
-    requestInit: { signal: controller.signal },
-  },
-});
-
-controller.abort();
 
 try {
-  await request;
+  await client.invoke({
+    serviceName: "user.UserService",
+    methodName: "getProfile",
+    params: { userId: 1 },
+  });
 } catch (error) {
-  if (!(isVrpcError(error) && error.kind === "abort")) {
-    throw error;
+  if (isVrpcError(error) && error.kind === "invoke") {
+    // Server rejected the invocation.
+    console.error(error.vrpcStatus, error.code, error.reason);
   }
 }
 ```
 
-Handle `abort` once in a global `onError` interceptor when cancellation should be silent in the UI. Timeouts remain `kind: "timeout"` and are not treated as caller cancellation.
+The generic HTTP client provides the equivalent `isHttpError` guard.
 
-## Protocol helpers
+## Browser CDN
 
-```ts
-import {
-  buildVrpcHeaders,
-  buildVrpcPath,
-  buildVrpcRequestBody,
-  generateVrpcId,
-} from "@yorun-ai/vrpc";
+Use the published ES module builds when you want to try a client without
+installing a package or configuring a bundler:
 
-const headers = buildVrpcHeaders({
-  clientInfo: {
-    clientName: "demo.browser",
-    clientVersion: "1.0.0",
-    clientInstanceId: getClientInstanceId(),
-  },
-  trace: { id: generateVrpcId() },
-  timeoutMs: 3_000,
-});
+```html
+<script type="module">
+  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/+esm";
 
-const path = buildVrpcPath("user.UserService", "getProfile");
-const body = buildVrpcRequestBody({ userId: 1 });
+  // ...
+</script>
 ```
+
+The package ships ES modules only. There is no global build, so a classic
+`<script src="...">` tag cannot be used; the tag must have `type="module"`.
+
+See [Browser CDN usage](docs/guides/cdn.md) for complete HTML examples, the
+generic HTTP entry, version pinning, and troubleshooting.
+
+## Entry points
+
+| Import                  | Contents                                                      |
+| ----------------------- | ------------------------------------------------------------- |
+| `@yorun-ai/vrpc`        | vRPC client, protocol helpers, transport, errors, and types.  |
+| `@yorun-ai/vrpc/client` | Explicit vRPC entry; identical to the package root.           |
+| `@yorun-ai/vrpc/http`   | Generic HTTP client, Fetch transport, HTTP errors, and types. |
+
+## Configuration at a glance
+
+Both clients accept `prefixUrl`, `headers`, `timeoutMs`, `requestInit`,
+`suppressGlobalToast`, `fetchImpl`, `transport`, and `interceptors`. The vRPC
+client additionally requires `clientInfo` and accepts `traceMode` and
+`cborCodec`. Per-request `options` override client defaults, and
+`context.options` always contains the merged result.
+
+The vRPC client adds two request options: `trace` replaces the generated
+`vrpc-trace` header, and `wire` selects JSON or CBOR for a single call. A wire
+schema is never serialized into the HTTP body, and it requires a `cborCodec`.
+
+## Advanced capabilities
+
+- **Interceptors** — `beforeRequest`, `afterResponse`, and `onError` hooks
+  registered with `client.use()`. `onError` runs before the request promise
+  rejects and does not swallow the failure.
+- **Cancellation** — pass an `AbortSignal` through `requestInit.signal`.
+  Cancellation rejects with `kind: "abort"`. Timeouts stay `kind: "timeout"`.
+- **Tracing** — `traceMode: "portal"` (default) generates a trace id;
+  `traceMode: "direct"` also generates a span. It never changes routing or
+  `prefixUrl`.
+- **CBOR** — provide a `cborCodec` and a per-call `wire` schema when arguments
+  or results contain `Binary`.
+- **Custom transport** — implement `VrpcTransport` or `HttpTransport` to
+  replace Fetch with another I/O layer.
+- **`suppressGlobalToast`** — application-defined error UI policy metadata.
+  The package never displays UI, skips `onError`, or consumes the rejection.
+
+The [Usage guide](docs/guides/usage.md) covers each capability with runnable
+examples.
 
 ## Documentation
 
-User guides:
+### User guides
 
-- [Usage](./docs/guides/usage.md): HTTP/vRPC client configuration and extension points.
-- [Axios integration](./docs/guides/axios.md): custom Axios transport and JSON protocol helpers.
+- [Usage](docs/guides/usage.md) — client configuration, request options,
+  interceptors, errors, cancellation, CBOR, and custom transports.
+- [Browser CDN](docs/guides/cdn.md) — CDN loading modes and complete HTML
+  examples.
+- [Axios integration](docs/guides/axios.md) — custom Axios transport and JSON
+  protocol helpers.
 
-Maintainer documentation:
+### Reference and maintainers
 
-- [Architecture](./docs/maintainers/architecture.md): module boundaries and request flow.
-- [vRPC protocol](./docs/maintainers/protocol.md): paths, envelopes, headers, content negotiation, wire schemas, and generated-client requirements.
-- [Releasing](./docs/maintainers/releasing.md): version management and npm publishing.
-- [Contributing](./CONTRIBUTING.md): development, testing, documentation, commit, and pull-request workflow.
+- [API Reference](docs/reference/README.md) — public exports, types,
+  configuration options, defaults, and errors.
+- [Architecture](docs/maintainers/architecture.md) — module boundaries and
+  request flow.
+- [vRPC protocol](docs/maintainers/protocol.md) — paths, envelopes, headers,
+  content negotiation, wire schemas, and generated-client requirements.
+- [Releasing](docs/maintainers/releasing.md) — version management and npm
+  publishing.
+- [Contributing](CONTRIBUTING.md) — development, testing, documentation, and
+  pull-request workflow.
 
-The root README and `docs/guides/` are for package users. `docs/maintainers/` is for repository maintainers and integrators implementing transports or code generation. Changes to public exports, types, defaults, headers, errors, or request behavior must be reflected in both the user-facing and maintainer documentation.
+The root README and `docs/guides/` are for package users. `docs/maintainers/`
+is for repository maintainers and integrators implementing transports or code
+generation.
+
+## Stability
+
+The package is in the `0.x` release line. It is ready for use, but versions
+below `1.0.0` do not guarantee a stable public API. A breaking change may be
+released in a new `0.x` minor version and will include migration guidance.
+Version `1.0.0` will mark the stable API commitment.
 
 ## License
 
