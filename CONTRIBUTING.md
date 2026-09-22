@@ -5,7 +5,7 @@ This guide defines the development, verification, documentation, commit, and pul
 ## Prerequisites
 
 - Node.js 24.11 or later.
-- pnpm 11.15.0, using the repository lockfile.
+- pnpm 12.5.1, using the repository lockfile.
 
 Install dependencies from the repository root:
 

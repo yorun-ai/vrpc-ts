@@ -25,7 +25,7 @@ assert.equal(
 assert.equal(packageJson.sideEffects, false, "package modules must remain side-effect free");
 assert.equal(
   packageJson.packageManager,
-  "pnpm@11.15.0",
+  "pnpm@12.5.1",
   "the repository package manager version must remain reproducible",
 );
 
