@@ -2,6 +2,9 @@
 
 Axios can send JSON vRPC directly or be wrapped as a runtime transport. When automatic CBOR, wire schemas, interceptors, and consistent error semantics are needed, wrap Axios as a transport and use it with `createVrpcClient`.
 
+For client configuration shared by both options, see the [Usage guide](./usage.md)
+and the [API Reference](../reference/README.md).
+
 ## Option A: send JSON vRPC directly
 
 ```ts

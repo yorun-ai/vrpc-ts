@@ -22,6 +22,7 @@ pnpm install --frozen-lockfile
 - `src/entrypoints/`: public package entrypoints.
 - `test/`: behavioral, compatibility, and release tests.
 - `docs/guides/`: user-facing guides.
+- `docs/reference/`: public API reference.
 - `docs/maintainers/`: architecture, protocol, and release documentation.
 
 Read `AGENTS.md`, `README.md`, and the applicable documentation before changing behavior or public contracts.
@@ -58,12 +59,33 @@ Do not commit generated `dist/` output or `node_modules/`.
 
 ## Documentation
 
-Repository documentation is maintained in English. The root `README.zh-CN.md` provides a Chinese project overview and links to the canonical English guides. Keep both root README files synchronized when their shared content changes.
+Documentation is part of the public API contract. Repository documentation is
+maintained in English; the root `README.zh-CN.md` is the Chinese entry point and
+must stay structurally aligned with `README.md`. Keep both root README files
+synchronized when their shared content changes.
 
 - Keep package overview and documentation navigation in `README.md` and `README.zh-CN.md`.
 - Put task-oriented material for package users in `docs/guides/`.
+- Put public exports, option tables, defaults, and error fields in `docs/reference/`.
 - Put architecture, protocol, release, and other repository-maintenance material in `docs/maintainers/`.
 - Keep protocol details in `docs/maintainers/protocol.md` instead of duplicating them in the architecture overview.
+
+Prefer linking to a canonical guide over duplicating long explanations across
+the README and `docs/`. Do not shorten the README by deleting useful detail;
+move that detail to the document that owns it.
+
+### Documentation requirements
+
+When changing public exports, types, defaults, request behavior, headers, error
+handling, or transport behavior:
+
+- Update the relevant user guide.
+- Update `docs/reference/README.md` when public signatures or behavior change.
+- Update `docs/maintainers/protocol.md` when wire behavior changes.
+- Keep README examples valid and consistent with the published package.
+- Keep `README.md` and `README.zh-CN.md` structurally aligned.
+- Verify CDN examples in `docs/guides/cdn.md` against the actual published
+  bundles, including loading mode and version pinning.
 
 ## Commits
 

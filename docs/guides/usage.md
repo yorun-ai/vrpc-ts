@@ -1,5 +1,10 @@
 # Usage
 
+This guide is the canonical reference for client configuration and extension
+points. For a no-build browser setup see [Browser CDN usage](./cdn.md), for the
+public API surface see the [API Reference](../reference/README.md), and for
+wire-level details see the [vRPC protocol](../maintainers/protocol.md).
+
 ## 1. Generic HTTP client
 
 ```ts
