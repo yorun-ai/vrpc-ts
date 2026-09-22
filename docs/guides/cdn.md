@@ -18,7 +18,7 @@ Two constraints apply to every CDN setup:
   builds, not an IIFE/UMD bundle. There is no `window.Vrpc` or `window.Http`
   global, and a classic `<script src="...">` without `type="module"` fails with
   a syntax error because the file contains `import` statements.
-- **Pin the version.** Use an exact version such as `@0.9.2` so a new release
+- **Pin the version.** Use an exact version such as `@0.9.3` so a new release
   cannot change the behavior of a page you already published.
 
 The runtime needs native ES modules, `fetch`, `AbortController`, and `Headers`.
@@ -52,7 +52,7 @@ Browser ESM with jsDelivr:
 
 ```html
 <script type="module">
-  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/+esm";
+  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/+esm";
 
   // ...
 </script>
@@ -62,7 +62,7 @@ The same API is available from the unbundled entry file:
 
 ```html
 <script type="module">
-  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/dist/client.es.js";
+  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/dist/client.es.js";
 </script>
 ```
 
@@ -70,7 +70,7 @@ Import the HTTP client from its own module path:
 
 ```html
 <script type="module">
-  import { createHttpClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/http/+esm";
+  import { createHttpClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/http/+esm";
 </script>
 ```
 
@@ -78,7 +78,7 @@ This form does **not** work, because the bundle is an ES module:
 
 ```html
 <!-- Fails: the runtime has no global build. -->
-<script src="https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/dist/client.es.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/dist/client.es.js"></script>
 <script>
   const client = Vrpc.createVrpcClient({/* ... */}); // Vrpc is undefined
 </script>
@@ -104,7 +104,7 @@ invokes a method, and renders either the result or a classified error.
         createVrpcClient,
         getClientInstanceId,
         isVrpcError,
-      } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/+esm";
+      } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/+esm";
 
       const output = document.getElementById("output");
 
@@ -160,7 +160,7 @@ headers.
       import {
         createHttpClient,
         isHttpError,
-      } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/http/+esm";
+      } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/http/+esm";
 
       const output = document.getElementById("output");
 
@@ -185,10 +185,10 @@ headers.
 Always pin an exact version in the URL:
 
 ```text
-https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/+esm
+https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/+esm
 ```
 
-`@0.9.2` is immutable on jsDelivr. A floating range such as `@0` resolves to the
+`@0.9.3` is immutable on jsDelivr. A floating range such as `@0` resolves to the
 newest `0.x` release and can pick up behavior changes; use it only for a
 throwaway prototype. Keep the pinned version aligned with the version in your
 `package.json` when the same project uses both.
@@ -211,8 +211,11 @@ header, see the [vRPC protocol](../maintainers/protocol.md) reference.
 
 ## 8. Verification status
 
-The examples in this guide were checked against the published `0.9.2` files in
-a real browser: the bundled `+esm` imports, the unbundled `dist/*.es.js` entry
-files, and the jsDelivr-generated `dist/*.es.min.js` variants all load as ES
-modules and complete a real invocation. Loading any of them as a classic
-script fails, and no global variable is created.
+The examples in this guide were checked against the `0.9.3` bundle in a real
+browser: the bundled `+esm` imports, the unbundled `dist/*.es.js` entry files,
+and the jsDelivr-generated `dist/*.es.min.js` variants all load as ES modules
+and complete a real invocation. Loading any of them as a classic script fails,
+and no global variable is created.
+
+Each version ships its own build, so re-check these loading modes when you move
+the pinned version.
