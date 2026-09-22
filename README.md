@@ -124,7 +124,7 @@ installing a package or configuring a bundler:
 
 ```html
 <script type="module">
-  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.2/+esm";
+  import { createVrpcClient } from "https://cdn.jsdelivr.net/npm/@yorun-ai/vrpc@0.9.3/+esm";
 
   // ...
 </script>
