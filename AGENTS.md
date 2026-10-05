@@ -23,3 +23,10 @@
 
 - After behavioral changes or refactoring, run `pnpm type-check`, `pnpm test`, and `pnpm build`.
 - Consult `docs/maintainers/architecture.md` and `CONTRIBUTING.md` for additional package, formatting, and lint checks relevant to the change.
+
+## Release Publication
+
+- Prepare the package.json version through a reviewed PR, merge after CI passes, sync main, then push its `v<version>` tag. Tag pushes trigger the Release workflow; do not publish locally or create tags from the npm publish script.
+- Validate tag identity, main ancestry and exact package version. Run quality/package checks, pack once, publish that tarball through npm trusted publishing, and confirm its registry integrity before creating GitHub Release.
+- Recovery uses the same tag: an existing npm version is reused only when its integrity matches the rebuilt tarball. Never overwrite npm versions, move release tags, or republish merely to repair GitHub Release creation.
+- GitHub Release is the final step. Keep `npm-publish` environment approval and npm OIDC configuration; ensure environment tag deployment rules permit reviewed version tags. See `docs/maintainers/releasing.md`.

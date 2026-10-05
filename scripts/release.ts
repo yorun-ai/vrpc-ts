@@ -5,7 +5,14 @@ import path from "node:path";
 import SimpleGit from "simple-git";
 import { $, argv, chalk, fs } from "zx";
 
-import { createPublishManifest, getNpmTag, publishFiles, registry } from "./release-package";
+import {
+  createPublishManifest,
+  getNpmTag,
+  publishFiles,
+  registry,
+  requireMatchingIntegrity,
+  requireReleaseTag,
+} from "./release-package";
 import { logger, run } from "./run";
 
 const packageJsonPath = path.join(process.cwd(), "package.json");
@@ -30,66 +37,21 @@ async function assertCleanWorkingTree() {
 
 async function prepareGit() {
   if (dryRun) {
-    logger.info("Dry-run mode allows local uncommitted release preparation changes");
+    logger.info("Dry-run allows local release preparation changes");
     return;
   }
-
-  await run(assertCleanWorkingTree(), {
-    info: "Checking the working directory",
-    success: "The working directory is clean",
-    error: "The working directory must be clean before pulling or publishing",
-  });
-
-  if (ci) {
-    if (process.env.GITHUB_ACTIONS !== "true") {
-      throw new Error("CI publishing is only supported from GitHub Actions.");
-    }
-    if (process.env.GITHUB_REF !== "refs/heads/main") {
-      throw new Error(
-        `CI publishing requires the main branch, received ${process.env.GITHUB_REF}.`,
-      );
-    }
-
-    const head = (await git.revparse(["HEAD"])).trim();
-    const originMain = (await git.revparse(["refs/remotes/origin/main"])).trim();
-    if (head !== originMain) {
-      throw new Error("The release commit must be the current origin/main commit.");
-    }
-
-    logger.success("The GitHub Actions checkout matches origin/main");
-    return;
+  if (!ci || process.env.GITHUB_ACTIONS !== "true") {
+    throw new Error(
+      "Publish by pushing a reviewed version tag to GitHub; use release:dry-run locally.",
+    );
   }
-
-  await run(git.raw(["pull", "--ff-only"]), {
-    info: "Pulling the latest changes from the remote repository",
-    success: "The latest changes have been pulled from the remote repository",
-    error: "Failed to pull the latest changes from the remote repository",
-  });
-
-  await run(assertCleanWorkingTree(), {
-    info: "Checking the working directory after pulling",
-    success: "The working directory is still clean",
-    error: "Pulling introduced uncommitted changes",
-  });
-
-  await run(git.push(), {
-    info: "Pushing the release commit to the remote repository",
-    success: "The release commit is available in the remote repository",
-    error: "Failed to push the release commit to the remote repository",
-  });
-}
-
-async function assertTagIsAvailable(tag: string) {
-  const localTags = await git.tags();
-  if (localTags.all.includes(tag)) {
-    throw new Error(`Git tag ${tag} already exists locally.`);
-  }
-
-  const tagRef = `refs/tags/${tag}`;
-  const remoteTag = await git.listRemote(["--tags", "origin", tagRef]);
-  if (remoteTag.trim().length > 0) {
-    throw new Error(`Git tag ${tag} already exists on origin.`);
-  }
+  await assertCleanWorkingTree();
+  const tag = process.env.RELEASE_TAG;
+  requireReleaseTag(tag, String((await fs.readJson(packageJsonPath)).version));
+  const head = (await git.revparse(["HEAD"])).trim();
+  const tagged = (await git.revparse([`refs/tags/${tag}^{commit}`])).trim();
+  if (head !== tagged) throw new Error("Checkout does not match the release tag.");
+  await git.raw(["merge-base", "--is-ancestor", head, "refs/remotes/origin/main"]);
 }
 
 async function runQualityChecks() {
@@ -148,46 +110,22 @@ async function createStagingDirectory(packageJson: Record<string, unknown>) {
   return stagingDirectory;
 }
 
-async function assertAuthenticated(registry: string) {
-  if (ci) {
-    if (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL || !process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
-      throw new Error(
-        "GitHub Actions OIDC is unavailable. Grant the workflow id-token: write permission.",
-      );
-    }
-
-    logger.success(
-      process.env.NODE_AUTH_TOKEN
-        ? "GitHub Actions OIDC and the bootstrap npm token are available"
-        : "GitHub Actions OIDC is available for npm trusted publishing",
-    );
-    return;
-  }
-
-  if (!process.env.NPM_CONFIG_USERCONFIG) {
-    throw new Error("Set NPM_CONFIG_USERCONFIG to the npm userconfig used for publishing.");
-  }
-
-  await run($`npm whoami --registry=${registry}`, {
-    info: `Verifying npm authentication for ${registry}`,
-    success: (response) => `Authenticated as ${chalk.cyan(String(response).trim())}`,
-    error: `Not authenticated with ${registry}`,
-  });
-}
-
-async function assertVersionIsAvailable(name: string, version: string, registry: string) {
+async function publishedIntegrity(name: string, version: string): Promise<string | undefined> {
   const result = await $({
     quiet: true,
     nothrow: true,
-  })`npm view ${`${name}@${version}`} version --registry=${registry}`;
-
+  })`npm view ${`${name}@${version}`} dist.integrity --json --registry=${registry}`;
   if (result.exitCode === 0) {
-    throw new Error(`${name}@${version} already exists on ${registry}.`);
+    const integrity: unknown = JSON.parse(result.stdout);
+    if (typeof integrity !== "string" || !integrity.startsWith("sha512-")) {
+      throw new Error("Published package has no valid SHA-512 integrity.");
+    }
+    return integrity;
   }
-
   if (!result.stderr.includes("E404")) {
-    throw new Error(`Unable to check ${name}@${version} on ${registry}: ${result.stderr.trim()}`);
+    throw new Error(`Unable to check npm package: ${result.stderr.trim()}`);
   }
+  return undefined;
 }
 
 async function publish() {
@@ -199,70 +137,67 @@ async function publish() {
   };
 
   const version = packageJson.version;
-  if (ci && process.env.RELEASE_VERSION !== version) {
-    throw new Error(
-      `Requested release ${String(process.env.RELEASE_VERSION)} does not match package.json version ${version}.`,
-    );
-  }
+  if (ci) requireReleaseTag(process.env.RELEASE_TAG, version);
   const npmTag = getNpmTag(version);
-  const tag = `v${version}`;
-
   await assertReleaseMetadata(packageJson);
-  await assertTagIsAvailable(tag);
 
   logger.info(
     `Preparing ${chalk.cyan(`${packageJson.name}@${version}`)} with npm tag ${chalk.cyan(npmTag)}.`,
   );
 
   await runQualityChecks();
-  await assertAuthenticated(registry);
-  await assertVersionIsAvailable(packageJson.name, version, registry);
 
   const stagingDirectory = await createStagingDirectory(packageJson);
 
   try {
+    const packed = await $({
+      quiet: true,
+    })`npm pack ${stagingDirectory} --json --pack-destination=${stagingDirectory}`;
+    const [{ filename, integrity }] = JSON.parse(packed.stdout) as {
+      filename: string;
+      integrity: string;
+    }[];
+    const tarball = path.join(stagingDirectory, filename);
+    const existing = await publishedIntegrity(packageJson.name, version);
+    if (existing !== undefined && !dryRun) {
+      requireMatchingIntegrity(integrity, existing);
+      logger.success(
+        "The existing npm version matches this build; resuming GitHub Release publication",
+      );
+      return;
+    }
+    if (
+      ci &&
+      (!process.env.ACTIONS_ID_TOKEN_REQUEST_URL || !process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN)
+    ) {
+      throw new Error("GitHub Actions OIDC is unavailable; grant id-token: write.");
+    }
     const publishArgs = [
       "publish",
-      stagingDirectory,
+      tarball,
       `--registry=${registry}`,
       `--tag=${npmTag}`,
       "--access=public",
       ...(ci ? ["--provenance"] : []),
       ...(dryRun ? ["--dry-run"] : []),
     ];
-
     await run($({ stdio: ci ? "pipe" : "inherit" })`npm ${publishArgs}`, {
       info: dryRun ? "Running npm publish dry-run" : "Publishing the package",
-      success: dryRun
-        ? "The npm publish dry-run completed successfully"
-        : `${packageJson.name}@${version} was published to ${registry}`,
-      error: dryRun ? "The npm publish dry-run failed" : "Failed to publish the package",
+      success: "npm publish completed",
+      error: "npm publish failed",
     });
+    if (!dryRun) {
+      let published: string | undefined;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        published = await publishedIntegrity(packageJson.name, version);
+        if (published !== undefined) break;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      requireMatchingIntegrity(integrity, published);
+    }
   } finally {
     await rm(stagingDirectory, { recursive: true, force: true });
   }
-
-  if (dryRun) {
-    return;
-  }
-
-  try {
-    await git.addTag(tag);
-  } catch (error) {
-    throw new Error(
-      `${packageJson.name}@${version} was published, but local Git tag ${tag} could not be created. Inspect the repository state, create the tag at the release commit, and push refs/tags/${tag}. ${String(error)}`,
-    );
-  }
-
-  try {
-    await git.push("origin", `refs/tags/${tag}`);
-  } catch (error) {
-    throw new Error(
-      `${packageJson.name}@${version} was published and local Git tag ${tag} was created, but the tag could not be pushed. Resolve remote access and run: git push origin refs/tags/${tag}. ${String(error)}`,
-    );
-  }
-
-  logger.success(`Created and pushed Git tag ${chalk.cyan(tag)}`);
 }
 
 publish().catch((error: unknown) => {

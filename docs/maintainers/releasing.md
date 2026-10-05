@@ -37,29 +37,20 @@ Version examples use the initial `0.9.0` release as the starting point:
 
 Running an alpha command again on its prerelease line increments the prerelease number, for example from `0.9.1-alpha.0` to `0.9.1-alpha.1`. Running the matching stable command on that prerelease removes the prerelease suffix.
 
-Review and commit the version change before publishing. A prerelease automatically uses its SemVer identifier as the dist-tag, such as `alpha`; a stable version uses `latest`. A successful release creates and pushes only the Git tag `v<version>` for that release.
+Review and commit the version change before publishing. A prerelease automatically uses its SemVer identifier as the dist-tag, such as `alpha`; a stable version uses `latest`. After the version PR passes CI and is merged, sync main and push only its reviewed `v<version>` tag. The tag starts publication.
 
 ## Publishing
 
-Before publishing, point `NPM_CONFIG_USERCONFIG` to the npm configuration used for publishing:
+Run `pnpm release:dry-run` locally to check the package without publishing.
+Actual publication runs only in GitHub Actions after pushing the version tag;
+`pnpm release` does not publish from a developer machine. The workflow checks
+that the checkout matches the tag, belongs to main history and has exactly the
+same version in package.json. It never creates, moves or pushes tags.
 
-```bash
-export NPM_CONFIG_USERCONFIG=/path/to/npmrc
-```
-
-Run the full checks and an npm dry-run first:
-
-```bash
-pnpm release:dry-run
-```
-
-After confirming the package name, version, file list, and dist-tag, publish:
-
-```bash
-pnpm release
-```
-
-The release script publishes the committed version from the root `package.json` and never changes the version during publishing. Before contacting npm, it verifies that the target tag does not exist locally or on `origin`, pulls with fast-forward only, and pushes the release commit. It never pushes unrelated local tags.
+Keep the `npm-publish` environment and npm trusted publisher configured for
+this repository and `release.yml`. Environment deployment rules must allow
+version tags, not only the main branch; existing required approvals still apply.
+The workflow uses OIDC with `id-token: write` and the pinned npm CLI.
 
 ## Release gates
 
@@ -75,18 +66,27 @@ pnpm build
 pnpm test:package
 ```
 
-The script then assembles the package in a system temporary directory, verifies the npm identity, confirms that the target version does not already exist, and runs `npm publish`. The temporary directory is removed after either success or failure.
+The script assembles the package in a temporary directory, runs npm pack once,
+and publishes that exact tarball with provenance. A stable version uses `latest`;
+a prerelease uses its SemVer identifier. The registry SHA-512 integrity must match
+the packed tarball before GitHub Release is created. Release notes are generated
+from GitHub history; this repository does not maintain a CHANGELOG. Prerelease
+tags create GitHub prereleases. Temporary package files are removed on exit.
 
-## Recovering a tag push
+## Recovery
 
-Publishing to npm and pushing a Git tag cannot be one atomic operation. If npm publishing succeeds but the final tag push fails, do not publish the version again.
+Rerun the failed workflow or dispatch it with the same existing tag. If npm
+already contains the version, compare its integrity with the rebuilt tarball:
+only an exact match skips npm upload and resumes GitHub Release creation.
+A mismatch, authentication failure or registry error stops publication. Recovery
+does not rewrite npm dist-tags, which may already point to a newer release.
+An existing published GitHub Release is left unchanged; an unpublished draft
+can finish publication. Do not move tags or unpublish npm versions to retry.
 
-If the local `v<version>` tag exists and points to the release commit, restore the remote tag with:
+For workflow changes, run `bash .github/scripts/release_test.sh`, ShellCheck,
+actionlint and the normal package checks. Full OIDC and hosted publication still
+require an actual version-tag run.
 
-```bash
-git push origin refs/tags/v<version>
-```
-
-If local tag creation failed, first verify the release commit, create `v<version>` at that exact commit, and then run the command above. Never use `git push --tags` as recovery because it may publish unrelated local tags.
-
-`package.json` must declare a reviewed license and the repository must contain the matching `LICENSE` file. Both staging and the post-build smoke test validate it. The published package contains JavaScript, type declarations, the bilingual root README, English guides and maintainer documentation, the contribution guide, LICENSE, and the package manifest.
+`package.json` must declare a reviewed license and the repository must contain
+the matching LICENSE. Published contents include JavaScript, declarations, both
+READMEs, guides, maintainer documentation, CONTRIBUTING, LICENSE and the manifest.

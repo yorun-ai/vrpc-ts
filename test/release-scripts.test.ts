@@ -1,8 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { createPublishManifest, getNextVersion, getNpmTag } from "../scripts/release-package";
+import {
+  createPublishManifest,
+  getNextVersion,
+  getNpmTag,
+  requireReleaseTag,
+  requireMatchingIntegrity,
+} from "../scripts/release-package";
 
 describe("release script helpers", () => {
+  it("requires the exact tag for the package version", () => {
+    expect(() => requireReleaseTag("v0.9.2", "0.9.2")).not.toThrow();
+    expect(() => requireReleaseTag("v0.9.3-rc.1", "0.9.3-rc.1")).not.toThrow();
+    for (const tag of [undefined, "main", "v0.9.1"]) {
+      expect(() => requireReleaseTag(tag, "0.9.2")).toThrow();
+    }
+  });
+
+  it("only recovers npm publication when the packed bytes match", () => {
+    expect(() => requireMatchingIntegrity("sha512-fixture", "sha512-fixture")).not.toThrow();
+    expect(() => requireMatchingIntegrity("sha512-fixture", "sha512-other")).toThrow();
+    expect(() => requireMatchingIntegrity("sha512-fixture", undefined)).toThrow();
+    expect(() => requireMatchingIntegrity("", "")).toThrow();
+  });
+
   it("prepares alpha, patch, minor, and major versions", () => {
     expect(getNextVersion("0.9.0", { type: "patch", stage: "alpha" })).toBe("0.9.1-alpha.0");
     expect(getNextVersion("0.9.0", { type: "minor", stage: "alpha" })).toBe("0.10.0-alpha.0");

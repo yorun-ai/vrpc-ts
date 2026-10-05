@@ -71,3 +71,17 @@ export function createPublishManifest(
 
   return manifest;
 }
+
+export function requireReleaseTag(tag: string | undefined, version: string): void {
+  if (!semver.valid(version) || tag !== `v${version}`) {
+    throw new Error(`Release tag ${String(tag)} does not match package.json version ${version}.`);
+  }
+}
+
+export function requireMatchingIntegrity(expected: string, actual: string | undefined): void {
+  if (!expected.startsWith("sha512-") || expected !== actual) {
+    throw new Error(
+      "npm package integrity does not match this build; refusing to publish a Release or overwrite the package.",
+    );
+  }
+}
