@@ -228,6 +228,20 @@ Recommended application policy:
 - Branch on expected `invoke` values such as `code` and `reason` near the feature that understands them. Use `suppressGlobalToast` when that feature owns the UI, preventing duplicate messages.
 - Treat values that fail `isVrpcError` as configuration, interceptor, or other unexpected application errors; do not silently classify them as network failures.
 
+### Upgrading to 0.10
+
+Version 0.10 removes the obsolete `type` field from `HttpErrorPayload`,
+`VrpcErrorPayload`, `HttpInvokeError`, and `VrpcInvokeError`. The current vRPC
+error payload contains `code`, `message`, `reason`, and `detail`.
+
+Replace checks of `error.type` according to their purpose: use `kind` after
+`isHttpError` or `isVrpcError` to distinguish client error categories, use
+`vrpcStatus` on vRPC invocation errors for the protocol outcome, and use `code`
+with `reason` for business-specific handling. These fields already existed in
+0.9, so callers can migrate before upgrading. Generic HTTP callers that consume
+a custom server field can still read the original response through `payload`
+after validating its shape.
+
 ### Global `onError` and local `try/catch`
 
 Global and local handlers have different responsibilities. A global `onError` interceptor is suitable for shared logging, reporting, and fallback UI. A local `try/catch` is suitable for an expected business outcome that the current feature can explain or recover from.
