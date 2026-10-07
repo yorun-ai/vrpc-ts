@@ -46,7 +46,7 @@ An error response has a null result and may carry a structured error:
 }
 ```
 
-The client treats a response as successful only when the HTTP status is successful and `vrpc-status` is `OK`. `vrpc-status` is the authoritative vRPC outcome; the body `error` supplies auxiliary `type`, `code`, `reason`, `message`, and `detail` fields. The runtime does not infer success from body fields or require `result` and `error` to form a strictly validated mutually exclusive envelope.
+The client treats a response as successful only when the HTTP status is successful and `vrpc-status` is `OK`. `vrpc-status` is the authoritative vRPC outcome; the body `error` supplies auxiliary `code`, `reason`, `message`, and `detail` fields. The runtime does not infer success from body fields or require `result` and `error` to form a strictly validated mutually exclusive envelope.
 
 Other responses are unwrapped as `VrpcInvokeError`. If a response already carries a failing `vrpc-status` but its body or auxiliary protocol metadata cannot be decoded, it remains a `VrpcInvokeError` with `payload: null`, while the decoding failure is preserved as `cause`. Every response must contain valid `content-type`, `vrpc-status`, and `vrpc-server` headers; a JSON body must be non-empty and parseable. A missing `vrpc-status`, or an otherwise undecodable successful response, produces `VrpcProtocolError` with the HTTP response metadata intact.
 

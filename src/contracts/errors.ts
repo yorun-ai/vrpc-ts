@@ -1,5 +1,4 @@
 export type HttpErrorPayload = {
-  type?: string;
   code?: string;
   message?: string;
   reason?: string;
@@ -138,7 +137,6 @@ function readServerErrorStringField(payload: unknown, field: keyof HttpErrorPayl
 }
 
 export class HttpInvokeError extends HttpClientError<"invoke"> {
-  type?: string;
   code?: string;
   reason?: string;
   detail?: string;
@@ -168,7 +166,6 @@ export class HttpInvokeError extends HttpClientError<"invoke"> {
     this.statusText = response.statusText;
     this.responseHeaders = response.headers;
     this.payload = payload;
-    this.type = readServerErrorStringField(payload, "type");
     this.code = readServerErrorStringField(payload, "code");
     this.reason = readServerErrorStringField(payload, "reason");
     this.detail = readServerErrorStringField(payload, "detail");

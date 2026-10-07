@@ -156,14 +156,14 @@ isVrpcError(error): error is VrpcError;
 isHttpError(error): error is HttpError;
 ```
 
-| `kind`      | Class                | Entry point | Extra fields                                                                             |
-| ----------- | -------------------- | ----------- | ---------------------------------------------------------------------------------------- |
-| `abort`     | `HttpAbortError`     | both        | `reason` (the `AbortSignal` reason), `url`, `method`, `cause`                            |
-| `timeout`   | `HttpTimeoutError`   | both        | `timeoutMs`, `code: "HTTP_TIMEOUT"`, `url`, `method`, `cause`                            |
-| `transport` | `HttpTransportError` | both        | `url`, `method`, `cause`                                                                 |
-| `invoke`    | `HttpInvokeError`    | both        | `status`, `statusText`, `responseHeaders`, `payload`, `type`, `code`, `reason`, `detail` |
-| `invoke`    | `VrpcInvokeError`    | vRPC        | All `HttpInvokeError` fields plus `vrpcStatus`                                           |
-| `protocol`  | `VrpcProtocolError`  | vRPC only   | `status`, `statusText`, `responseHeaders`, `vrpcStatus`                                  |
+| `kind`      | Class                | Entry point | Extra fields                                                                     |
+| ----------- | -------------------- | ----------- | -------------------------------------------------------------------------------- |
+| `abort`     | `HttpAbortError`     | both        | `reason` (the `AbortSignal` reason), `url`, `method`, `cause`                    |
+| `timeout`   | `HttpTimeoutError`   | both        | `timeoutMs`, `code: "HTTP_TIMEOUT"`, `url`, `method`, `cause`                    |
+| `transport` | `HttpTransportError` | both        | `url`, `method`, `cause`                                                         |
+| `invoke`    | `HttpInvokeError`    | both        | `status`, `statusText`, `responseHeaders`, `payload`, `code`, `reason`, `detail` |
+| `invoke`    | `VrpcInvokeError`    | vRPC        | All `HttpInvokeError` fields plus `vrpcStatus`                                   |
+| `protocol`  | `VrpcProtocolError`  | vRPC only   | `status`, `statusText`, `responseHeaders`, `vrpcStatus`                          |
 
 `HttpError` is `HttpAbortError | HttpTimeoutError | HttpTransportError |
 HttpInvokeError`. `VrpcError` adds `VrpcInvokeError` and `VrpcProtocolError`;
