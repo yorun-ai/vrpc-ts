@@ -430,7 +430,6 @@ describe("http client", () => {
       fetchImpl: (async () => {
         return new Response(
           JSON.stringify({
-            type: "AUTH",
             code: "UNAUTHORIZED",
             message: "unauthorized",
             reason: "session-expired",
@@ -448,7 +447,6 @@ describe("http client", () => {
     await expect(client.request({ path: "private", method: "POST" })).rejects.toMatchObject({
       name: "HttpInvokeError",
       message: "unauthorized",
-      type: "AUTH",
       code: "UNAUTHORIZED",
       reason: "session-expired",
       detail: "",

@@ -105,7 +105,6 @@ describe("vrpc protocol helpers", () => {
         {
           result: null,
           error: {
-            type: "OPERATION",
             code: "SERVICE_ERROR",
             message: "service failed",
             reason: "data-locked",
@@ -141,7 +140,6 @@ describe("vrpc protocol helpers", () => {
       {
         result: null,
         error: {
-          type: "INPUT",
           code: "BAD_REQUEST",
           message: "invalid params",
           reason: "missing-name",
@@ -155,7 +153,6 @@ describe("vrpc protocol helpers", () => {
       throw new Error("expected parseVrpcResponse to produce a failed response");
     }
     expect(parsed.error).toEqual({
-      type: "INPUT",
       code: "BAD_REQUEST",
       message: "invalid params",
       reason: "missing-name",
@@ -165,7 +162,6 @@ describe("vrpc protocol helpers", () => {
     expect(parsed.payload).toEqual({
       result: null,
       error: {
-        type: "INPUT",
         code: "BAD_REQUEST",
         message: "invalid params",
         reason: "missing-name",

@@ -12,7 +12,6 @@ describe("VrpcInvokeError", () => {
     });
 
     const error = new VrpcInvokeError(response, {
-      type: "OPERATION",
       code: "INTERNAL_ERROR",
       message: "server failed",
       reason: "data-locked",
@@ -20,7 +19,6 @@ describe("VrpcInvokeError", () => {
     });
 
     expect(error.message).toBe("server failed\nrow lock timeout");
-    expect(error.type).toBe("OPERATION");
     expect(error.code).toBe("INTERNAL_ERROR");
     expect(error.reason).toBe("data-locked");
     expect(error.detail).toBe("row lock timeout");
