@@ -5,55 +5,8 @@ import {
   VrpcResponseLike,
   VrpcWireSchema,
 } from "../contracts/types";
-import {
-  assertValidVrpcServerHeader,
-  mediaTypeOf,
-  VRPC_CBOR_CONTENT_TYPE,
-  VRPC_JSON_CONTENT_TYPE,
-} from "./headers";
-import { fromCborWireValue, normalizeCborValue } from "./wire";
-
-type VrpcSuccessPayload<TResponse> = {
-  result: TResponse;
-  error: null;
-};
-
-type VrpcErrorPayloadEnvelope = {
-  result: null;
-  error?: unknown;
-};
-
-function readEnvelopeError(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return payload;
-  }
-  return (payload as VrpcErrorPayloadEnvelope).error ?? payload;
-}
-
-function readEnvelopeResult(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return undefined;
-  }
-  return (payload as { result?: unknown }).result;
-}
-
-function requireResponseHeader(response: Response, name: string) {
-  const value = response.headers.get(name);
-  if (!value) {
-    throw new Error(`Invalid vRPC response: missing ${name} header.`);
-  }
-  return value;
-}
-
-function readDecodedEnvelopeField(payload: unknown, field: "result" | "error") {
-  if (payload instanceof Map) {
-    return payload.get(field);
-  }
-  if (payload && typeof payload === "object") {
-    return (payload as Record<string, unknown>)[field];
-  }
-  return undefined;
-}
+import { resolveVrpcEnvelope } from "./data";
+import { decodeVrpcBody } from "./response-body";
 
 export async function decodeVrpcResponsePayload(
   response: Response,
@@ -61,39 +14,7 @@ export async function decodeVrpcResponsePayload(
   resultSchema: VrpcWireSchema | undefined,
 ) {
   try {
-    requireResponseHeader(response, "vrpc-status");
-    assertValidVrpcServerHeader(response.headers.get("vrpc-server"));
-
-    const contentType = mediaTypeOf(requireResponseHeader(response, "content-type"));
-    if (contentType === VRPC_JSON_CONTENT_TYPE) {
-      const text = await response.text();
-      if (!text) {
-        throw new Error("Invalid vRPC response: empty response body.");
-      }
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error("Invalid vRPC response: JSON body cannot be parsed.");
-      }
-    }
-
-    if (contentType !== VRPC_CBOR_CONTENT_TYPE) {
-      throw new Error(`Invalid vRPC response content-type: ${contentType || "empty"}.`);
-    }
-    if (!resultSchema) {
-      throw new Error("Invalid vRPC response: unexpected CBOR body for a JSON method.");
-    }
-    if (!cborCodec) {
-      throw new Error("A cborCodec is required to decode a CBOR vRPC response.");
-    }
-
-    const decoded = await cborCodec.decode(new Uint8Array(await response.arrayBuffer()));
-    const result = readDecodedEnvelopeField(decoded, "result");
-    const error = readDecodedEnvelopeField(decoded, "error");
-    return {
-      result: fromCborWireValue(result, resultSchema),
-      error: normalizeCborValue(error),
-    };
+    return await decodeVrpcBody(response, cborCodec, resultSchema);
   } catch (cause) {
     if (cause instanceof VrpcProtocolError) {
       throw cause;
@@ -160,37 +81,16 @@ function resolveVrpcResponse<TResponse = unknown>(
   const url = responseLike.url || response.url || "";
   const method = responseLike.method || "POST";
 
-  if (response.ok && vrpcStatus === "OK") {
-    return {
-      response,
-      parsed: {
-        ok: true,
-        status: response.status,
-        statusText,
-        vrpcStatus: "OK",
-        headers: response.headers,
-        url,
-        method,
-        payload,
-        result: (payload as VrpcSuccessPayload<TResponse>).result,
-        error: null,
-      },
-    };
-  }
-
   return {
     response,
     parsed: {
-      ok: false,
       status: response.status,
       statusText,
-      vrpcStatus,
       headers: response.headers,
       url,
       method,
       payload,
-      result: readEnvelopeResult(payload),
-      error: readEnvelopeError(payload),
+      ...resolveVrpcEnvelope<TResponse>(response.status, vrpcStatus, payload),
     },
   };
 }

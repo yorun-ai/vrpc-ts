@@ -8,7 +8,7 @@ const fixtureRoot = path.join(packageRoot, "test", "package-consumers");
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "vrpc-package-types-"));
 
 try {
-  for (const consumer of ["esm", "cjs", "bundler"]) {
+  for (const consumer of ["esm", "cjs", "bundler", "protocol"]) {
     await cp(path.join(fixtureRoot, consumer), path.join(temporaryRoot, consumer), {
       recursive: true,
     });
@@ -19,7 +19,7 @@ try {
   await symlink(packageRoot, packageLink, process.platform === "win32" ? "junction" : "dir");
 
   const tsc = path.join(packageRoot, "node_modules", ".bin", "tsc");
-  for (const consumer of ["esm", "cjs", "bundler"]) {
+  for (const consumer of ["esm", "cjs", "bundler", "protocol"]) {
     const result = spawnSync(tsc, ["-p", path.join(temporaryRoot, consumer)], {
       stdio: "inherit",
     });

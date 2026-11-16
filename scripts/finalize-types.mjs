@@ -3,7 +3,7 @@ import path from "node:path";
 
 const outputDirectory = path.join(process.cwd(), "dist");
 
-for (const entrypoint of ["client", "http"]) {
+for (const entrypoint of ["client", "http", "protocol"]) {
   await copyFile(
     path.join(outputDirectory, `${entrypoint}.d.ts`),
     path.join(outputDirectory, `${entrypoint}.d.cts`),

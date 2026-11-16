@@ -138,11 +138,14 @@ generic HTTP entry, version pinning, and troubleshooting.
 
 ## Entry points
 
-| Import                  | Contents                                                      |
-| ----------------------- | ------------------------------------------------------------- |
-| `@yorun-ai/vrpc`        | vRPC client, protocol helpers, transport, errors, and types.  |
-| `@yorun-ai/vrpc/client` | Explicit vRPC entry; identical to the package root.           |
-| `@yorun-ai/vrpc/http`   | Generic HTTP client, Fetch transport, HTTP errors, and types. |
+| Import                    | Contents                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `@yorun-ai/vrpc`          | vRPC client, protocol helpers, transport, errors, and types.                                      |
+| `@yorun-ai/vrpc/client`   | Explicit vRPC entry; identical to the package root.                                               |
+| `@yorun-ai/vrpc/http`     | Generic HTTP client, Fetch transport, HTTP errors, and types.                                     |
+| `@yorun-ai/vrpc/protocol` | Runtime-independent protocol helpers with plain header records and adapter-provided body readers. |
+
+For miniapps and other runtimes without Fetch objects, use the [protocol entry](docs/guides/protocol.md). It adds no polyfills or network implementation. Existing root/client/http APIs remain unchanged.
 
 ## Configuration at a glance
 
@@ -186,6 +189,13 @@ examples.
   examples.
 - [Axios integration](docs/guides/axios.md) — custom Axios transport and JSON
   protocol helpers.
+- [Taro integration](docs/guides/taro.md) — native requests with the protocol
+  entry and compatibility with existing generated SDKs and response hooks.
+- [Protocol helpers](docs/guides/protocol.md) — runtime-independent headers,
+  encoding, response validation, and adapter responsibilities.
+
+- [Upgrading to 0.11.0](docs/guides/upgrading-0.11.md) — motivation, compatibility,
+  Taro hook/error migration, and the unchanged official H5 dependency.
 
 ### Reference and maintainers
 

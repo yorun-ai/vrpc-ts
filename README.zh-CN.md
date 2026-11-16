@@ -133,11 +133,14 @@ try {
 
 ## 入口
 
-| Import                  | 内容                                                 |
-| ----------------------- | ---------------------------------------------------- |
-| `@yorun-ai/vrpc`        | vRPC client、协议 helper、transport、错误与类型。    |
-| `@yorun-ai/vrpc/client` | 显式 vRPC 入口，与包根入口一致。                     |
-| `@yorun-ai/vrpc/http`   | 通用 HTTP client、Fetch transport、HTTP 错误与类型。 |
+| Import                    | 内容                                                                   |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `@yorun-ai/vrpc`          | vRPC client、协议 helper、transport、错误与类型。                      |
+| `@yorun-ai/vrpc/client`   | 显式 vRPC 入口，与包根入口一致。                                       |
+| `@yorun-ai/vrpc/http`     | 通用 HTTP client、Fetch transport、HTTP 错误与类型。                   |
+| `@yorun-ai/vrpc/protocol` | 不依赖运行环境的协议工具，使用普通请求头对象和平台提供的正文读取函数。 |
+
+小程序等缺少 Fetch 对象的环境可使用[独立协议入口](docs/guides/protocol.md)。它不安装 polyfill，也不负责网络请求；现有 root/client/http API 保持不变。
 
 ## 配置概览
 
@@ -176,6 +179,13 @@ vRPC client 还提供两个请求选项：`trace` 覆盖自动生成的 `vrpc-tr
 - [Browser CDN（English）](docs/guides/cdn.md)：CDN 加载方式与完整 HTML 示例。
 - [Axios integration（English）](docs/guides/axios.md)：自定义 Axios transport 与
   JSON 协议 helper。
+- [Taro integration（English）](docs/guides/taro.md)：使用协议入口接入原生请求，
+  并兼容已有生成 SDK 和响应钩子。
+- [Protocol helpers（English）](docs/guides/protocol.md)：不依赖运行环境的请求头、
+  编码、响应校验，以及平台适配器的职责。
+
+- [Upgrading to 0.11.0（English）](docs/guides/upgrading-0.11.md)：升级原因、兼容边界、
+  Taro 钩子/错误迁移，以及保持不变的官方 H5 依赖。
 
 ### Reference 与维护者文档
 

@@ -416,6 +416,8 @@ const body = buildVrpcRequestBody({ userId: 1 });
 
 `parseVrpcResponse` returns a normalized result without throwing; `unwrapVrpcResponse` throws `VrpcInvokeError` on failure. A fully custom HTTP client is responsible for JSON/CBOR decoding of the response body; `createVrpcClient` handles it when using a runtime transport.
 
+The helpers above retain their browser-oriented `Headers`/`Response` contracts. For runtimes without those objects, use the additive [`@yorun-ai/vrpc/protocol` entry](protocol.md). The [Taro integration guide](taro.md) covers native requests and retaining compatibility objects only where the existing client contract needs them.
+
 ## 7. Custom transport
 
 A transport performs I/O only, and the response body must remain raw bytes:

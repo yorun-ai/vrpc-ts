@@ -18,6 +18,7 @@ export default defineConfig({
     lib: {
       entry: {
         client: fileURLToPath(new URL("./src/entrypoints/client.ts", import.meta.url)),
+        protocol: fileURLToPath(new URL("./src/entrypoints/protocol.ts", import.meta.url)),
         http: fileURLToPath(new URL("./src/entrypoints/http.ts", import.meta.url)),
       },
       name: "Vrpc",

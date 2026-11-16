@@ -27,7 +27,7 @@ describe("client entrypoints", () => {
     expect("HttpParseError" in httpEntrypoint).toBe(false);
   });
 
-  it("only publishes client and http entrypoints", () => {
-    expect(Object.keys(packageJson.exports)).toEqual([".", "./client", "./http"]);
+  it("adds the protocol entrypoint without changing existing export paths", () => {
+    expect(Object.keys(packageJson.exports)).toEqual([".", "./client", "./http", "./protocol"]);
   });
 });
