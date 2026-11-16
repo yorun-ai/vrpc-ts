@@ -13,7 +13,7 @@
 - `src/core/`: protocol-independent lifecycle and HTTP/vRPC client assembly, without runtime network I/O.
 - `src/transports/`: network I/O, `AbortController`, and raw-byte responses.
 - `src/protocol/`: Vine headers, paths, envelopes, wire-schema conversion, and response parsing.
-- `src/entrypoints/`: public exports for `./client` and `./http`.
+- `src/entrypoints/`: public exports for `./client`, `./http`, and `./protocol`.
 
 A transport response must preserve the original `Uint8Array | null`. The generic HTTP core parses JSON, text, or empty responses, while the vRPC core selects JSON or a user-provided CBOR codec according to `content-type`.
 
@@ -54,6 +54,12 @@ Caller cancellation still reaches `onError` and still rejects the request promis
 The vRPC protocol layer owns path construction, request and response envelopes, content negotiation, protocol headers, wire-schema conversion, and protocol-level errors. `core` orchestrates those operations; `transports` only send HTTP requests and preserve raw response bytes.
 
 The complete wire contract and the requirements for generated clients are documented in [vRPC protocol](protocol.md). Changes to that contract must be reviewed across the runtime, protocol tests, generated-code consumers, and documentation.
+
+## Runtime-independent protocol entry
+
+`./protocol` exposes plain header records and structural body readers. It neither imports a network transport nor installs globals. Its declarations compile with only the ECMAScript library (no DOM or Node types). Shared header construction, body decoding, wire conversion and envelope status evaluation are used by the browser API too. Browser wrappers retain their existing signatures and error classes.
+
+The new `VrpcResponseError` uses plain `responseHeaders`; it deliberately does not masquerade as the existing browser errors, whose header contract is `Headers`. Use the protocol error class for pure adapters. `VrpcClient` and its required `use()` method remain unchanged. Platform adapters must make supported hooks explicit. An application-local data-hook API can avoid Fetch objects while preserving the generated invocation boundary; unsupported legacy Response hooks must fail at registration, not be ignored. This is an opt-in platform usage change. The runtime does not add native client factories or change the existing browser interface.
 
 ## Verification
 

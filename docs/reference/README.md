@@ -9,11 +9,12 @@ is internal and may change in any release.
 
 ## Package entry points
 
-| Import                  | Contents                                                                 |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `@yorun-ai/vrpc`        | Identical to `@yorun-ai/vrpc/client`.                                    |
-| `@yorun-ai/vrpc/client` | vRPC client, protocol helpers, id helpers, transport, errors, and types. |
-| `@yorun-ai/vrpc/http`   | Generic HTTP client, Fetch transport, HTTP errors, and HTTP types.       |
+| Import                    | Contents                                                                 |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `@yorun-ai/vrpc`          | Identical to `@yorun-ai/vrpc/client`.                                    |
+| `@yorun-ai/vrpc/client`   | vRPC client, protocol helpers, id helpers, transport, errors, and types. |
+| `@yorun-ai/vrpc/http`     | Generic HTTP client, Fetch transport, HTTP errors, and HTTP types.       |
+| `@yorun-ai/vrpc/protocol` | Runtime-independent protocol helpers and plain response data.            |
 
 Each entry point publishes an ESM build (`import`), a CommonJS build
 (`require`), and matching type declarations.
@@ -238,3 +239,24 @@ Exported from `@yorun-ai/vrpc` and `@yorun-ai/vrpc/client`:
 The package is in the `0.x` line. The public API is not yet covered by a stable
 `1.x` compatibility commitment, and a breaking change may ship in a new `0.x`
 minor release with migration guidance.
+
+## Runtime-independent protocol entry
+
+`@yorun-ai/vrpc/protocol` has no Fetch/DOM runtime or type-library requirement. See [the adapter guide](../guides/protocol.md).
+
+| Export                                         | Purpose                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `buildVrpcHeaderRecord(options)`               | Validated protocol headers as `Record<string, string>`; takes the same `BuildVrpcHeadersOptions` as the existing browser builder.          |
+| `normalizeVrpcHeaderRecord(headers)`           | Case-insensitive response headers, including array values. Rejects invalid names and newline/NUL values.                                   |
+| `mergeVrpcApplicationHeaders(...headers)`      | Case-insensitive application overrides; rejects reserved protocol headers.                                                                 |
+| `decodeVrpcResponse<T>(source, options?)`      | Full response metadata/body validation and result unwrapping; accepts optional `cborCodec` and `resultSchema`.                             |
+| `decodeVrpcResponseData<T>(source, options?)`  | Full decoding before unwrapping an invocation failure; returns `VrpcResponseResult<T>`.                                                    |
+| `parseVrpcResponseData<T>(metadata, payload)`  | Inspect the outcome of an already decoded envelope; does not validate media type or server identity.                                       |
+| `unwrapVrpcResponseData<T>(metadata, payload)` | Return an already decoded result or throw `VrpcResponseError` for an invocation failure.                                                   |
+| `VrpcResponseError`                            | `kind: "protocol" \| "invoke"`, status, plain `responseHeaders`, `vrpcStatus`, URL/method, payload, code/reason/detail and optional cause. |
+
+The entry also exports the existing pure path/body builders, request encoding, ID generation, content-type constants, and client-info/trace/wire/codec types. `VrpcResponseSource` contains status, headers, optional statusText/URL/method and `text()` / `arrayBuffer()` readers, which may return values or Promises. Body reading and UTF-8 decoding belong to the adapter.
+
+`VrpcResponseError` is a separate additive error contract. It is not recognized by the browser-oriented `isVrpcError` guard and has no `Headers` methods. Existing browser errors, guards, and protocol helper signatures are unchanged.
+
+`VrpcClient` remains unchanged and continues to require `invoke()` and `use()`. Generated SDKs require no changes. `decodeVrpcResponseData<T>(source, options?)` returns a fully decoded `VrpcResponseResult<T>` before unwrapping a business failure, allowing adapters to preserve interceptor ordering and existing error classes.

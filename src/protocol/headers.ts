@@ -120,33 +120,29 @@ export function mediaTypeOf(value: string | null) {
   return value?.split(";", 1)[0]?.trim().toLowerCase() || "";
 }
 
-export function buildVrpcHeaders({
+export function buildVrpcHeaderRecord({
   clientInfo,
   trace,
   timeoutMs,
   requestUsesCbor = false,
   responseUsesCbor = false,
-}: BuildVrpcHeadersOptions): Headers {
+}: BuildVrpcHeadersOptions): Record<string, string> {
   assertClientInfo(clientInfo);
   assertValidVrpcTrace(trace);
   assertValidVrpcTimeout(timeoutMs);
 
-  const headers = new Headers();
-  headers.set("content-type", requestUsesCbor ? VRPC_CBOR_CONTENT_TYPE : VRPC_JSON_CONTENT_TYPE);
-  headers.set(
-    "accept",
-    responseUsesCbor
+  const headers: Record<string, string> = {
+    "content-type": requestUsesCbor ? VRPC_CBOR_CONTENT_TYPE : VRPC_JSON_CONTENT_TYPE,
+    accept: responseUsesCbor
       ? `${VRPC_CBOR_CONTENT_TYPE}, ${VRPC_JSON_CONTENT_TYPE}`
       : VRPC_JSON_CONTENT_TYPE,
-  );
-  headers.set(
-    "vrpc-client",
-    `name=${clientInfo.clientName},version=${clientInfo.clientVersion},instanceId=${clientInfo.clientInstanceId}`,
-  );
-  headers.set("vrpc-trace", trace.span ? `id=${trace.id},span=${trace.span}` : `id=${trace.id}`);
-  if (timeoutMs !== undefined) {
-    headers.set("vrpc-options", `timeout=${timeoutMs}ms`);
-  }
-
+    "vrpc-client": `name=${clientInfo.clientName},version=${clientInfo.clientVersion},instanceId=${clientInfo.clientInstanceId}`,
+    "vrpc-trace": trace.span ? `id=${trace.id},span=${trace.span}` : `id=${trace.id}`,
+  };
+  if (timeoutMs !== undefined) headers["vrpc-options"] = `timeout=${timeoutMs}ms`;
   return headers;
+}
+
+export function buildVrpcHeaders(options: BuildVrpcHeadersOptions): Headers {
+  return new Headers(buildVrpcHeaderRecord(options));
 }

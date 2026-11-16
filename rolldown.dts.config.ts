@@ -4,6 +4,7 @@ import { dts } from "rolldown-plugin-dts";
 const entrypoints = {
   client: "./src/entrypoints/client.ts",
   http: "./src/entrypoints/http.ts",
+  protocol: "./src/entrypoints/protocol.ts",
 };
 
 export default defineConfig(

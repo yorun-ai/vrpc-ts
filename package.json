@@ -1,6 +1,6 @@
 {
   "name": "@yorun-ai/vrpc",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "vRPC and HTTP request library",
   "homepage": "https://github.com/yorun-ai/vrpc-ts#readme",
   "bugs": {
@@ -53,6 +53,16 @@
       "require": {
         "types": "./dist/http.d.cts",
         "default": "./dist/http.cjs"
+      }
+    },
+    "./protocol": {
+      "import": {
+        "types": "./dist/protocol.d.ts",
+        "default": "./dist/protocol.es.js"
+      },
+      "require": {
+        "types": "./dist/protocol.d.cts",
+        "default": "./dist/protocol.cjs"
       }
     }
   },
